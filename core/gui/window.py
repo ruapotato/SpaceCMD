@@ -52,6 +52,13 @@ class Window:
             self.rect.height - Theme.WINDOW_TITLEBAR_HEIGHT - Theme.WINDOW_BORDER_WIDTH
         )
 
+        # Resize content widget to match content area
+        if self.content_widget and hasattr(self.content_widget, 'set_size'):
+            self.content_widget.set_size(
+                self.rect.width - Theme.WINDOW_BORDER_WIDTH * 2,
+                self.rect.height - Theme.WINDOW_TITLEBAR_HEIGHT - Theme.WINDOW_BORDER_WIDTH
+            )
+
         # Button rectangles (relative to window)
         button_y = Theme.WINDOW_PADDING
         button_size = Theme.WINDOW_BUTTON_SIZE

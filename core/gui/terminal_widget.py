@@ -312,11 +312,10 @@ class TerminalWidget:
         Returns:
             pygame.Surface: Rendered terminal surface
         """
-        # Create surface if needed
-        if self.surface is None or self.surface.get_size() != (self.width, self.height):
-            self.surface = pygame.Surface((self.width, self.height))
+        # ALWAYS create a fresh surface to ensure rendering works
+        self.surface = pygame.Surface((self.width, self.height))
 
-        # ALWAYS clear and redraw the entire surface
+        # Clear with background color
         self.surface.fill(TERMINAL_BG)
 
         if not Theme.FONT_TERMINAL:
@@ -392,6 +391,13 @@ class TerminalWidget:
                 cursor_offset = self.cursor_pos
 
         # ALWAYS render the input text (even if empty string)
+        if visible_input:  # Debug: only render if there's text
+            print(f"RENDER DEBUG: Rendering '{visible_input}' at y={input_y}, prompt_width={prompt_width}")
+            # Draw a bright background behind the text to make it VERY visible
+            text_bg_width = len(visible_input) * self.char_width if self.char_width > 0 else len(visible_input) * 8
+            pygame.draw.rect(self.surface, (50, 50, 80),
+                           (4 + prompt_width, input_y, text_bg_width, self.char_height))
+
         input_surface = Theme.FONT_TERMINAL.render(visible_input, True, TERMINAL_FG)
         self.surface.blit(input_surface, (4 + prompt_width, input_y))
 
