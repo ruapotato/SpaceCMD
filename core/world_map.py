@@ -1,8 +1,9 @@
 """
 World Map System
 
-FTL-style sector-based navigation with:
-- Multiple sectors with increasing difficulty
+Spiral galaxy navigation with:
+- 2D spiral pattern from outer edge to center
+- Difficulty increases toward the center
 - Different node types (combat, store, event, nebula)
 - Path choices and strategic navigation
 - Scaling rewards and enemies
@@ -11,6 +12,7 @@ FTL-style sector-based navigation with:
 from enum import Enum
 from typing import List, Dict, Optional, Tuple
 import random
+import math
 
 
 class NodeType(Enum):
@@ -30,16 +32,19 @@ class NodeType(Enum):
 class MapNode:
     """A single location on the map"""
 
-    def __init__(self, node_id: str, node_type: NodeType, sector: int, position: Tuple[int, int]):
+    def __init__(self, node_id: str, node_type: NodeType, sector: int, position: Tuple[int, int],
+                 distance_from_center: float = 0.0):
         self.id = node_id
         self.type = node_type
-        self.sector = sector  # Which sector (0-based)
+        self.sector = sector  # Which sector/ring (0-based, 0=outer, higher=inner)
         self.position = position  # (x, y) for visualization
         self.visited = False
         self.connections: List[str] = []  # IDs of connected nodes
+        self.distance_from_center = distance_from_center  # For difficulty calculation
 
-        # Node-specific data
-        self.difficulty = sector  # Base difficulty = sector number
+        # Node-specific data (difficulty based on distance to center)
+        # Closer to center = harder (inverse of distance)
+        self.difficulty = sector  # Sector also tracks progression
         self.reward_scrap = 0
         self.enemy_type = None
         self.event_id = None
@@ -63,56 +68,124 @@ class WorldMap:
         self.current_node_id: Optional[str] = None
         self.current_sector = 0
 
+        # Spiral parameters
+        self.spiral_center_x = 0  # Will be set during generation
+        self.spiral_center_y = 0
+        self.total_nodes = num_sectors * nodes_per_sector
+
         # Generate the map
-        self._generate_map()
+        self._generate_spiral_map()
 
-    def _generate_map(self):
-        """Generate a random map with sectors and nodes"""
-        node_counter = 0
-        all_sector_nodes = {}  # sector -> [node_ids]
+    def _generate_spiral_map(self):
+        """
+        Generate a spiral galaxy map.
 
-        # First pass: Create all nodes
-        for sector in range(self.num_sectors):
-            # Each sector has multiple nodes arranged vertically
-            sector_nodes = []
+        - Nodes arranged in a spiral from outer edge (easy) to center (hard)
+        - Difficulty increases as you approach the center
+        - Boss at the center
+        """
+        # Spiral parameters
+        max_radius = 400  # Starting radius (outer edge)
+        min_radius = 50   # Ending radius (center)
+        total_angle = math.pi * 6  # 3 full rotations
 
-            for i in range(self.nodes_per_sector):
-                node_id = f"S{sector}N{i}"
+        # Calculate center position for visualization
+        self.spiral_center_x = 0
+        self.spiral_center_y = 0
 
-                # Determine node type based on sector and position
-                node_type = self._determine_node_type(sector, i)
+        all_nodes_ordered = []  # Keep track of node order for connections
 
-                # Position for visualization
-                x = sector * 120 + random.randint(-10, 10)
-                y = i * 80 + random.randint(-10, 10)
-                position = (x, y)
+        # Create nodes along spiral
+        for i in range(self.total_nodes):
+            # Progress from 0.0 (outer) to 1.0 (center)
+            progress = i / max(1, self.total_nodes - 1)
 
-                node = MapNode(node_id, node_type, sector, position)
+            # Spiral parameters
+            theta = progress * total_angle  # Angle increases as we spiral in
+            radius = max_radius - (max_radius - min_radius) * progress  # Radius decreases
 
-                # Set difficulty and rewards
-                node.difficulty = sector
-                if node_type == NodeType.COMBAT:
-                    node.reward_scrap = 10 + sector * 5 + random.randint(0, 5)
-                    node.enemy_type = self._get_enemy_for_sector(sector)
-                elif node_type == NodeType.ELITE_COMBAT:
-                    node.reward_scrap = 20 + sector * 10 + random.randint(5, 15)
-                    node.enemy_type = self._get_elite_enemy_for_sector(sector)
-                elif node_type == NodeType.STORE:
-                    node.reward_scrap = 0  # Stores cost money
+            # Add some randomness to avoid perfect spiral
+            theta += random.uniform(-0.1, 0.1)
+            radius += random.uniform(-20, 20)
 
-                self.nodes[node_id] = node
-                sector_nodes.append(node_id)
-                node_counter += 1
+            # Calculate position
+            x = self.spiral_center_x + radius * math.cos(theta)
+            y = self.spiral_center_y + radius * math.sin(theta)
+            position = (int(x), int(y))
 
-            all_sector_nodes[sector] = sector_nodes
+            # Determine sector (divide into rings/sectors)
+            sector = int(progress * self.num_sectors)
+            sector = min(sector, self.num_sectors - 1)
 
-        # Second pass: Connect nodes between sectors
-        for sector in range(self.num_sectors - 1):
-            self._connect_sector_nodes(all_sector_nodes[sector], sector + 1)
+            # Node ID
+            node_id = f"N{i:03d}"
 
-        # Set starting node
-        self.current_node_id = "S0N0"
-        self.nodes[self.current_node_id].visited = True
+            # Distance from center (for difficulty)
+            distance_from_center = radius
+
+            # Determine node type
+            node_type = self._determine_node_type(sector, i)
+
+            # Boss at the end (center)
+            if i == self.total_nodes - 1:
+                node_type = NodeType.BOSS
+
+            # Create node
+            node = MapNode(node_id, node_type, sector, position, distance_from_center)
+
+            # Set difficulty (inverse of distance - closer to center = harder)
+            # Normalize to 0-7 range
+            node.difficulty = int((1.0 - progress) * 0.5 + progress * 7.5)
+
+            # Set rewards based on difficulty
+            if node_type == NodeType.COMBAT:
+                node.reward_scrap = 10 + node.difficulty * 5 + random.randint(0, 5)
+                node.enemy_type = self._get_enemy_for_difficulty(node.difficulty)
+            elif node_type == NodeType.ELITE_COMBAT:
+                node.reward_scrap = 20 + node.difficulty * 10 + random.randint(5, 15)
+                node.enemy_type = self._get_elite_enemy_for_difficulty(node.difficulty)
+            elif node_type == NodeType.STORE:
+                node.reward_scrap = 0  # Stores cost money
+            elif node_type == NodeType.BOSS:
+                node.reward_scrap = 100
+                node.enemy_type = "rebel_flagship"
+
+            self.nodes[node_id] = node
+            all_nodes_ordered.append(node)
+
+        # Connect nodes
+        # Each node connects to 2-3 nearby nodes further along the spiral
+        for i, node in enumerate(all_nodes_ordered[:-1]):  # Skip last node (boss)
+            # Connect to next 1-3 nodes along spiral
+            num_connections = random.randint(2, 3)
+
+            for j in range(1, num_connections + 1):
+                next_idx = min(i + j, len(all_nodes_ordered) - 1)
+                if next_idx > i and next_idx < len(all_nodes_ordered):
+                    next_node = all_nodes_ordered[next_idx]
+                    # Add bidirectional connection (can backtrack if needed)
+                    if next_node.id not in node.connections:
+                        node.connections.append(next_node.id)
+
+            # Also add some cross-connections to nearby nodes in space
+            for other in all_nodes_ordered[max(0, i-3):i+5]:
+                if other.id == node.id:
+                    continue
+
+                # Check distance
+                dx = node.position[0] - other.position[0]
+                dy = node.position[1] - other.position[1]
+                dist = math.sqrt(dx*dx + dy*dy)
+
+                # Connect if very close
+                if dist < 80 and random.random() < 0.3:
+                    if other.id not in node.connections and len(node.connections) < 4:
+                        node.connections.append(other.id)
+
+        # Set starting node (first node - outer edge)
+        self.current_node_id = "N000"
+        if self.current_node_id in self.nodes:
+            self.nodes[self.current_node_id].visited = True
 
     def _determine_node_type(self, sector: int, position: int) -> NodeType:
         """Determine what type of node this should be"""
@@ -150,25 +223,33 @@ class WorldMap:
         else:
             return NodeType.EMPTY
 
-    def _get_enemy_for_sector(self, sector: int) -> str:
-        """Get enemy type appropriate for sector difficulty"""
-        if sector == 0:
+    def _get_enemy_for_difficulty(self, difficulty: int) -> str:
+        """Get enemy type appropriate for difficulty level (0-7)"""
+        if difficulty <= 1:
             return "gnat"
-        elif sector <= 2:
+        elif difficulty <= 3:
             return random.choice(["pirate_scout", "gnat"])
-        elif sector <= 5:
+        elif difficulty <= 5:
             return random.choice(["pirate_scout", "mantis_fighter"])
         else:
             return random.choice(["mantis_fighter", "rebel_fighter"])
 
-    def _get_elite_enemy_for_sector(self, sector: int) -> str:
-        """Get elite enemy type for sector"""
-        if sector <= 2:
+    def _get_elite_enemy_for_difficulty(self, difficulty: int) -> str:
+        """Get elite enemy type for difficulty level"""
+        if difficulty <= 2:
             return "mantis_fighter"
-        elif sector <= 5:
+        elif difficulty <= 5:
             return "rebel_fighter"
         else:
             return "rebel_fighter"  # TODO: Add more enemy types
+
+    def _get_enemy_for_sector(self, sector: int) -> str:
+        """Get enemy type appropriate for sector difficulty (legacy compatibility)"""
+        return self._get_enemy_for_difficulty(sector)
+
+    def _get_elite_enemy_for_sector(self, sector: int) -> str:
+        """Get elite enemy type for sector (legacy compatibility)"""
+        return self._get_elite_enemy_for_difficulty(sector)
 
     def _connect_sector_nodes(self, sector_nodes: List[str], next_sector: int):
         """Connect nodes in current sector to nodes in next sector"""

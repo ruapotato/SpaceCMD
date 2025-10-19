@@ -169,34 +169,38 @@ class MapWidgetV2:
         return False
 
     def _get_node_screen_pos(self, node):
-        """Get screen position for a node"""
-        # Vertical layout: sectors are columns, nodes are rows
-        sector_x = self.padding + node.sector * self.sector_width - self.scroll_x
+        """Get screen position for a node (spiral galaxy layout)"""
+        # Use node's actual position from spiral generation
+        # Center the spiral in the middle of the widget
+        center_x = self.width // 2
+        center_y = self.height // 2 - 50  # Offset for title and info panel
 
-        # Get all nodes in this sector
-        sector_nodes = [n for n in self.world_manager.world_map.nodes.values()
-                       if n.sector == node.sector]
+        # Scale and position the spiral coordinates
+        scale = self.zoom
+        x = center_x + int(node.position[0] * scale) - int(self.scroll_x)
+        y = center_y + int(node.position[1] * scale) - int(self.scroll_y)
 
-        # Find index of this node in sector
-        try:
-            node_idx = sector_nodes.index(node)
-        except ValueError:
-            return None
-
-        node_y = self.padding + 60 + node_idx * self.node_spacing_y - self.scroll_y
-
-        return (sector_x, node_y)
+        return (x, y)
 
     def update(self, dt):
         """Update widget state"""
-        # Auto-scroll to keep current sector visible
+        # Auto-center on current node for spiral galaxy
         if self.world_manager:
             current = self.world_manager.world_map.get_current_node()
             if current:
-                target_x = current.sector * self.sector_width
-                # Smooth scroll
-                diff = target_x - self.scroll_x
-                self.scroll_x += diff * 0.1
+                # Keep current node roughly centered
+                center_x = self.width // 2
+                center_y = self.height // 2 - 50
+
+                # Calculate where the node wants to be on screen
+                target_scroll_x = current.position[0] * self.zoom
+                target_scroll_y = current.position[1] * self.zoom
+
+                # Smooth scroll toward target
+                diff_x = target_scroll_x - self.scroll_x
+                diff_y = target_scroll_y - self.scroll_y
+                self.scroll_x += diff_x * 0.05
+                self.scroll_y += diff_y * 0.05
 
     def render(self):
         """Render the map"""
@@ -228,31 +232,44 @@ class MapWidgetV2:
         title_rect = title.get_rect(center=(self.width // 2, 20))
         self.surface.blit(title, title_rect)
 
-        # Draw sector headers and progress
-        num_sectors = self.world_manager.world_map.num_sectors
-        for sector in range(num_sectors):
-            sector_x = self.padding + sector * self.sector_width - int(self.scroll_x)
+        # Draw center marker for spiral galaxy
+        center_x = self.width // 2
+        center_y = self.height // 2 - 50
 
-            # Skip if off-screen
-            if sector_x < -100 or sector_x > self.width + 100:
-                continue
+        # Draw concentric circles to show difficulty rings
+        num_rings = 5
+        max_radius_visual = 400 * self.zoom
+        for ring in range(num_rings, 0, -1):
+            ring_radius = int((ring / num_rings) * max_radius_visual)
+            ring_alpha = 30 + (ring * 10)
 
-            # Sector header
-            sector_label = f"SECTOR {sector + 1}"
-            sector_font = pygame.font.SysFont('sans-serif', 16, bold=True)
+            # Create semi-transparent circle
+            ring_surface = pygame.Surface((ring_radius*2, ring_radius*2), pygame.SRCALPHA)
+            ring_color = (100, 50, 50, ring_alpha) if ring <= 2 else (50, 50, 100, ring_alpha)
+            pygame.draw.circle(ring_surface, ring_color, (ring_radius, ring_radius), ring_radius, 2)
 
-            # Highlight current sector
-            if current_node and current_node.sector == sector:
-                color = (255, 200, 100)
-                # Draw highlight box
-                pygame.draw.rect(self.surface, (60, 40, 0),
-                               (sector_x - 20, 45, 160, 25), border_radius=4)
+            # Position on screen
+            ring_x = center_x - ring_radius - int(self.scroll_x)
+            ring_y = center_y - ring_radius - int(self.scroll_y)
+            self.surface.blit(ring_surface, (ring_x, ring_y))
+
+            # Ring labels
+            if ring == 1:
+                label = "CENTER - HARDEST"
+                label_color = (255, 100, 100)
+            elif ring == num_rings:
+                label = "OUTER EDGE - EASIEST"
+                label_color = (100, 255, 100)
             else:
-                color = (150, 150, 150)
+                label = None
 
-            sector_text = sector_font.render(sector_label, True, color)
-            text_rect = sector_text.get_rect(center=(sector_x + 60, 57))
-            self.surface.blit(sector_text, text_rect)
+            if label:
+                label_font = pygame.font.SysFont('sans-serif', 12, bold=True)
+                label_surf = label_font.render(label, True, label_color)
+                label_x = center_x - int(self.scroll_x)
+                label_y = center_y - ring_radius - int(self.scroll_y) - 15
+                label_rect = label_surf.get_rect(center=(label_x, label_y))
+                self.surface.blit(label_surf, label_rect)
 
         # Draw connections between nodes
         for node in self.world_manager.world_map.nodes.values():
