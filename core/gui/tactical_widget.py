@@ -170,6 +170,10 @@ class TacticalWidget:
         self.selected_crew = None
         self.crew_rects = {}  # Maps crew name to clickable rect
 
+        # Background stars for atmosphere
+        self.bg_stars = [(random.randint(0, width), random.randint(0, height - self.command_log_height),
+                         random.randint(1, 3)) for _ in range(100)]
+
     def set_size(self, width, height):
         """Update widget size"""
         self.width = width
@@ -254,9 +258,34 @@ class TacticalWidget:
 
     def _render_ship(self, surface, ship, offset_x, offset_y, is_enemy=False):
         """Render a single ship's interior with improved visuals"""
-        # Ship outline color
+        # Ship color theme
         ship_color = (220, 60, 60) if is_enemy else (60, 220, 120)
         accent_color = (255, 100, 100) if is_enemy else (100, 255, 150)
+        glow_color = (255, 150, 150) if is_enemy else (150, 255, 200)
+
+        # Calculate ship bounds for hull outline
+        min_x = min(room.x for room in ship.rooms) * self.room_size
+        max_x = max(room.x + room.width for room in ship.rooms) * self.room_size
+        min_y = min(room.y for room in ship.rooms) * self.room_size
+        max_y = max(room.y + room.height for room in ship.rooms) * self.room_size
+
+        # Draw ship hull outline with glow effect
+        hull_rect = pygame.Rect(
+            offset_x + min_x - 8,
+            offset_y + min_y - 8,
+            max_x - min_x + 16,
+            max_y - min_y + 16
+        )
+
+        # Glow layers (multiple for effect)
+        for i in range(3, 0, -1):
+            glow_alpha = 40 * (4 - i)
+            glow_surf = pygame.Surface((hull_rect.width + i*4, hull_rect.height + i*4), pygame.SRCALPHA)
+            pygame.draw.rect(glow_surf, (*glow_color, glow_alpha), glow_surf.get_rect(), border_radius=12)
+            surface.blit(glow_surf, (hull_rect.x - i*2, hull_rect.y - i*2))
+
+        # Main hull outline
+        pygame.draw.rect(surface, ship_color, hull_rect, 3, border_radius=8)
 
         # Title with glow effect
         if Theme.FONT_TITLE:
@@ -313,28 +342,45 @@ class TacticalWidget:
             room_w = room.width * self.room_size
             room_h = room.height * self.room_size
 
-            # Room background
+            # Room background with gradient
             room_rect = pygame.Rect(room_x, room_y, room_w, room_h)
 
-            # Fill color based on status
-            bg_color = (20, 20, 40)
+            # Base colors
+            bg_top = (25, 25, 55)
+            bg_bottom = (15, 15, 35)
 
             # Highlight room if crew is selected (to show it's clickable)
             if self.selected_crew and not is_enemy:
-                bg_color = (30, 30, 50)  # Slightly brighter
+                bg_top = (40, 40, 70)
+                bg_bottom = (25, 25, 50)
 
-            pygame.draw.rect(surface, bg_color, room_rect)
+            # Draw gradient background
+            for i in range(room_h):
+                blend = i / room_h
+                r = int(bg_top[0] * (1 - blend) + bg_bottom[0] * blend)
+                g = int(bg_top[1] * (1 - blend) + bg_bottom[1] * blend)
+                b = int(bg_top[2] * (1 - blend) + bg_bottom[2] * blend)
+                pygame.draw.line(surface, (r, g, b), (room_x, room_y + i), (room_x + room_w, room_y + i))
 
             # Border color based on health
             border_color = room.get_status_color()
 
             # Extra bright border if this is a target room (when crew is selected)
-            border_width = 2
+            border_width = 3
             if self.selected_crew and not is_enemy:
                 border_color = (100, 255, 150)  # Green highlight for targetable rooms
-                border_width = 3
+                border_width = 4
 
-            pygame.draw.rect(surface, border_color, room_rect, border_width)
+                # Add pulsing glow effect for targetable rooms
+                import time
+                pulse = abs((time.time() * 2) % 2 - 1)  # 0 to 1 to 0
+                glow_alpha = int(50 + 50 * pulse)
+                glow_surf = pygame.Surface((room_w + 8, room_h + 8), pygame.SRCALPHA)
+                pygame.draw.rect(glow_surf, (*border_color, glow_alpha), glow_surf.get_rect(), border_radius=4)
+                surface.blit(glow_surf, (room_x - 4, room_y - 4))
+
+            # Main border with rounded corners
+            pygame.draw.rect(surface, border_color, room_rect, border_width, border_radius=4)
 
             # System icon/name
             if room.system_type and Theme.FONT_SMALL:
@@ -367,28 +413,44 @@ class TacticalWidget:
 
             # Crew indicators (interactive!)
             if room.crew and Theme.FONT_SMALL:
-                crew_y = room_y + room_h - 20
+                crew_y = room_y + room_h - 25
                 for i, crew_name in enumerate(room.crew):
                     # Crew icon position
-                    crew_x = room_x + 10 + (i * 20)
+                    crew_x = room_x + 15 + (i * 28)
 
                     # Determine if this crew is selected
                     is_selected = (self.selected_crew == crew_name)
 
                     # Draw crew indicator (larger and more visible)
-                    crew_size = 8
+                    crew_size = 10
                     crew_color = (255, 255, 100) if is_selected else (100, 200, 255)
 
-                    # Clickable rect for crew
-                    crew_rect = pygame.Rect(crew_x - crew_size, crew_y - crew_size, crew_size * 2, crew_size * 2)
+                    # Clickable rect for crew (larger hit area)
+                    crew_rect = pygame.Rect(crew_x - crew_size - 2, crew_y - crew_size - 2,
+                                          (crew_size + 2) * 2, (crew_size + 2) * 2)
                     self.crew_rects[crew_name] = crew_rect
 
-                    # Draw crew icon
+                    # Draw crew icon with glow
+                    if is_selected:
+                        # Glowing selection halo
+                        for r in range(crew_size + 6, crew_size, -1):
+                            alpha = int(100 * ((r - crew_size) / 6))
+                            glow_surf = pygame.Surface((r*2, r*2), pygame.SRCALPHA)
+                            pygame.draw.circle(glow_surf, (*crew_color, alpha), (r, r), r)
+                            surface.blit(glow_surf, (crew_x - r, crew_y - r))
+
+                    # Outer rim (dark)
+                    pygame.draw.circle(surface, (20, 20, 20), (crew_x, crew_y), crew_size + 2)
+
+                    # Main crew icon
                     pygame.draw.circle(surface, crew_color, (crew_x, crew_y), crew_size)
 
-                    # Selection indicator
+                    # Inner highlight
+                    pygame.draw.circle(surface, (255, 255, 255), (crew_x - 2, crew_y - 2), 3)
+
+                    # Selection ring
                     if is_selected:
-                        pygame.draw.circle(surface, (255, 255, 0), (crew_x, crew_y), crew_size + 2, 2)
+                        pygame.draw.circle(surface, (255, 255, 0), (crew_x, crew_y), crew_size + 4, 2)
 
             # Fire/breach indicators
             if room.on_fire:
@@ -477,8 +539,17 @@ class TacticalWidget:
         # Clear crew rects for fresh tracking
         self.crew_rects = {}
 
-        # Clear surface with gradient background
+        # Clear surface with space background
         self.surface.fill((5, 5, 20))
+
+        # Draw background stars
+        for star_x, star_y, star_size in self.bg_stars:
+            brightness = random.randint(150, 255)
+            star_color = (brightness, brightness, brightness)
+            if star_size == 1:
+                self.surface.set_at((star_x, star_y), star_color)
+            else:
+                pygame.draw.circle(self.surface, star_color, (star_x, star_y), star_size // 2)
 
         # Calculate main display area (leaving room for command log)
         main_height = self.height - self.command_log_height
