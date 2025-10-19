@@ -55,10 +55,16 @@ class ShipOS(UnixSystem):
   All ship systems are controlled through device files:
 
     /dev/ship/         - Hardware devices (hull, shields, reactor)
-    /proc/ship/        - Ship state (status, power info)
+    /proc/ship/        - Ship state (status, power, crew AI)
     /sys/ship/systems/ - Ship systems (engines, weapons, shields)
-    /sys/ship/crew/    - Crew member status
+    /sys/ship/crew/    - Crew bot status (read-only)
     /sys/ship/rooms/   - Room status (oxygen, fire, venting)
+
+  Crew are AUTONOMOUS BOTS that automatically handle:
+    - System repairs
+    - Fire suppression
+    - Oxygen management
+    - System operation
 
   Everything is a file. Everything is hackable.
 
@@ -163,6 +169,31 @@ Crew: {len(self.ship.crew)}
 
         self.vfs.device_handlers['proc_ship_power'] = (power_info_read, lambda data: 0)
         self.vfs.create_device('/proc/ship/power', True, 0, 0, device_name='proc_ship_power')
+
+        # /proc/ship/crew_ai - AI bot status
+        def crew_ai_read(size):
+            ai_status = "=== AUTONOMOUS CREW AI ===\n"
+            for crew in self.ship.crew:
+                location = crew.room.name if crew.room else "Unassigned"
+                action = "Idle"
+
+                # Determine what AI is doing
+                if crew.room:
+                    if crew.room.on_fire:
+                        action = "Fighting fire"
+                    elif crew.room.health < 1.0:
+                        action = "Repairing system"
+                    elif crew.room.oxygen_level < 0.8:
+                        action = "Monitoring oxygen"
+                    else:
+                        action = "Operating system"
+
+                ai_status += f"{crew.name:20} @ {location:15} - {action}\n"
+
+            return ai_status.encode('utf-8')
+
+        self.vfs.device_handlers['proc_ship_crew_ai'] = (crew_ai_read, lambda data: 0)
+        self.vfs.create_device('/proc/ship/crew_ai', True, 0, 0, device_name='proc_ship_crew_ai')
 
     def _mount_systems_sysfs(self):
         """Mount ship systems to /sys/ship/systems (like /sys/class/net)"""

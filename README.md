@@ -1,447 +1,337 @@
-# SpaceCMD - FTL-Inspired Terminal Spaceship Game
+# SpaceCMD - Hackable Spaceship Operating System
 
-**Command your spaceship through a custom terminal interface. Manage crew, allocate power, and survive tactical combat - all from the command line.**
-
-Inspired by FTL: Faster Than Light, SpaceCMD brings roguelike spaceship combat to your terminal with beautiful ASCII graphics and a custom command-line interface.
+A terminal-based spaceship command simulator powered by **ShipOS** - a complete Unix-like operating system where **everything is a file** and **everything is hackable**.
 
 ```
-╔══════════════════════════════════════════════════════════╗
-║                  KESTREL - HUMAN CRUISER                 ║
-╚══════════════════════════════════════════════════════════╝
-
-  HULL:    [████████████] 30/30
-  SHIELDS: [████████████] 4/4
-  POWER:   ⚡⚡⚡⚡⚡⚡⚡░ 7/8
-  FUEL:    20
-
-  SHIP LAYOUT:
-
-  Helm         🎯 [████████] ░░ 👤
-  Shields      🛡️ [████████] ⚡⚡░
-  Oxygen       💨 [████████] ⚡
-  Weapons      🔴 [████████] ⚡⚡░░ 👤
-  Engines      ⚙️ [████████] ⚡⚡░ 👤
-
-Kestrel> power shields 4
-Kestrel> fire 1
-Kestrel> status
+╔═══════════════════════════════════════════════════════════════╗
+║                      KESTREL SHIP OS                          ║
+║                   HUMAN CRUISER CLASS                         ║
+╚═══════════════════════════════════════════════════════════════╝
 ```
 
-## 🎮 How to Play
+## 🚀 What is SpaceCMD?
 
-### Roguelike Mode (Recommended for First Time)
+SpaceCMD is an FTL-inspired spaceship simulator where you control your ship through a **real scripting language** (PooScript). Every command is a script you can read, modify, and hack. The entire ship is mounted as device files in `/dev`, `/proc`, and `/sys`.
 
-Complete campaign with tutorial, combat, and story:
+### Key Features
+
+- **Full Unix-like OS**: Shell, VFS, processes, permissions, kernel syscalls
+- **PooScript Language**: Python-like scripting language for ship control
+- **Everything is Hackable**: All commands are PooScript files you can modify
+- **Device File Interface**: Ship systems exposed as `/dev`, `/proc`, `/sys` files
+- **Autonomous Crew Bots**: AI-controlled crew that manage repairs and emergencies
+- **Beautiful Terminal UI**: LCARS-style interface with animated starfield
+- **Real Kernel Syscalls**: Use `kernel.open()`, `kernel.read()`, `kernel.write()`
+
+## 🎮 Quick Start
 
 ```bash
-python3 game.py
-```
-
-Navigate sectors, fight pirates, upgrade your ship, reach Federation HQ!
-
-### Quick Play Mode
-
-Jump straight into ship management:
-
-```bash
-python3 play.py --ship kestrel
-```
-
-Choose from multiple ship classes and start commanding!
-
-### Advanced Mode (Experimental)
-
-Ship OS mode with filesystem interface (work in progress):
-
-```bash
-python3 shipos.py --ship kestrel
-```
-
-**Note:** ShipOS mode is experimental and uses a custom command-line interface, not a full Unix emulation.
-
-## 🚀 Quick Start
-
-```bash
-# Clone the repository
+# Install (no dependencies beyond Python 3)
 git clone https://github.com/ruapotato/SpaceCMD.git
 cd SpaceCMD
 
-# Play the roguelike campaign
-python3 game.py
+# Launch the game
+python3 play.py
 
-# Or quick play mode
+# Or choose a specific ship
 python3 play.py --ship kestrel
-
-# Skip intro sequences
-python3 play.py --ship kestrel --no-intro
 ```
 
-**Requirements:** Python 3.7+ (no external dependencies!)
+## 📁 The Ship Filesystem
 
-## 🎯 Core Gameplay
-
-### Ship Systems
-
-Your ship has critical systems that need power and crew:
-
-- **🛡️ Shields** - Absorb incoming damage before hull takes hits
-- **🔴 Weapons** - Lasers, missiles, ion cannons to destroy enemies
-- **⚙️ Engines** - Evasion chance and FTL jump capability
-- **💨 Oxygen** - Keep your crew alive (critical!)
-- **💉 Medbay** - Heal injured crew members
-- **⚡ Reactor** - Limited power - allocate wisely!
-- **🎯 Helm** - Navigation and piloting
-- **📡 Sensors** - Scan enemy ships
-- **🚪 Doors** - Contain fires and breaches
-
-### Resources You Manage
-
-- **Power** - Limited reactor output; choose what systems get power
-- **Hull** - Your ship's health; 0 = game over
-- **Fuel** - Required for FTL jumps between sectors
-- **Scrap** - Currency for upgrades and repairs
-- **Missiles** - Limited ammo for missile weapons
-
-### Your Crew
-
-Each crew member is an individual:
-
-- **Skills** - Weapons, piloting, engines, shields, repair, combat
-- **Health** - Can be injured in combat or by hazards
-- **Position** - Assign crew to rooms for system bonuses
-- **Experience** - Crew improve as they work
-
-## 🕹️ Commands
-
-### Basic Commands
+Everything in your ship is accessible as a file:
 
 ```
-status          - Show complete ship status
-systems         - List all ship systems and power levels
-crew            - Show crew roster and positions
-help            - Show available commands
-exit            - Quit game
+/dev/ship/           - Hardware devices
+  ├── hull           - Read hull integrity
+  ├── shields        - Read shield strength
+  ├── reactor        - Read reactor power
+  └── fuel           - Read fuel level
+
+/proc/ship/          - Ship state (like /proc in Linux)
+  ├── status         - Complete ship status
+  ├── power          - Power allocation info
+  └── crew_ai        - Autonomous crew bot status
+
+/sys/ship/           - Ship subsystems (like /sys in Linux)
+  ├── systems/       - Individual ship systems
+  │   ├── engines/
+  │   ├── weapons/
+  │   ├── shields/
+  │   └── ...
+  ├── crew/          - Crew bot status (read-only)
+  └── rooms/         - Room status (oxygen, fire, etc)
 ```
 
-### Ship Management
+## 🤖 Autonomous Crew Bots
 
-```
-power <system> <amount>     - Allocate power
-  Example: power shields 3
+Your crew are **autonomous AI bots** that manage themselves:
 
-assign <crew> <room>        - Move crew to a room
-  Example: assign hayes weapons
+- ✅ **Automatically repair** damaged systems
+- ✅ **Fight fires** in rooms
+- ✅ **Monitor oxygen** levels
+- ✅ **Operate systems** efficiently
+- ✅ **No manual assignment** needed!
 
-repair <system>             - Order crew to repair damaged system
-  Example: repair weapons
-
-wait [seconds]              - Advance time
-  Example: wait 5
-```
-
-### Combat Commands
-
-```
-target <system>     - Target enemy weapons/shields/engines
-fire <weapon>       - Fire a weapon (1, 2, 3, etc.)
-shield <level>      - Raise/lower shields
+View crew bot activity:
+```bash
+crew                      # Show what each bot is doing
+cat /proc/ship/crew_ai    # View raw AI status
 ```
 
-## 🎨 Ship Classes
+Crew bots make intelligent decisions based on ship conditions. You focus on **tactics and power management**, they handle the details!
 
-### Kestrel (Balanced - Recommended for Beginners)
-- Balanced stats
-- Good shields (4 layers)
-- 3 crew members
-- Multiple weapon slots
-- Great all-around ship
-
-### Stealth Ship (Hard Mode)
-- **NO SHIELDS** - relies on cloaking and evasion
-- 2 crew members
-- Fast engines
-- High risk, high reward
-
-### Mantis Cruiser (Boarding Specialist)
-- Has teleporter for crew boarding
-- 4 Mantis crew (strong fighters)
-- Designed for boarding enemy ships
-- Unique playstyle
-
-More ships to unlock as you play!
-
-## ⚔️ Combat
-
-Tactical real-time combat with pause:
-
-1. **Target** enemy systems (weapons, shields, engines)
-2. **Charge** your weapons take time to power up
-3. **Fire** when ready - timing is crucial
-4. **Shields** absorb hits before hull damage
-5. **Crew** position them for bonuses and repairs
-6. **Power** manage reactor allocation on the fly
-
-Enemy ships fight back! Manage damage, fires, breaches, and oxygen while returning fire.
-
-## 🌌 Exploration
-
-- Navigate through **procedurally generated sectors**
-- Each sector has multiple **beacons** to jump to
-- Random encounters at each location:
-  - ⚔️ **Pirates** - Fight or flee
-  - 📡 **Distress signals** - Help or trap?
-  - 💰 **Merchants** - Buy fuel, weapons, crew
-  - ⭐ **Anomalies** - Strange events
-  - 🚢 **Abandoned ships** - Scavenge supplies
-  - ☄️ **Asteroid fields** - Navigate hazards
-
-## 🎲 Roguelike Elements
-
-- **Permadeath** - One ship, one life
-- **Procedural generation** - Every run is different
-- **Risk vs. Reward** - Push deeper or play it safe?
-- **Unlockables** - New ships and achievements
-- **Replayability** - Multiple paths to victory
-
-## 📊 Example Session
+## 🛠️ Basic Commands
 
 ```bash
-$ python3 play.py --ship kestrel
+# Ship status
+status              # Show complete ship status
+systems             # List all ship systems
+crew                # Show autonomous crew bot status
+rooms               # Show room status
 
-Kestrel> status
-=== KESTREL (HUMAN CRUISER) ===
-Hull: 30/30 | Shields: 4/4
-Power: 7/8 | Fuel: 20
+# Power management
+power               # Show power allocation
+power shields 3     # Allocate 3 power to shields
 
-Kestrel> systems
-=== SHIP SYSTEMS ===
-Helm         [ONLINE ] HP:100% PWR:0/2
-Shields      [ONLINE ] HP:100% PWR:2/3
-Weapons      [ONLINE ] HP:100% PWR:2/4
-Engines      [ONLINE ] HP:100% PWR:2/3
-Oxygen       [ONLINE ] HP:100% PWR:1/1
+# Room control
+vent helm           # Toggle venting in helm
 
-Kestrel> crew
-=== CREW ROSTER ===
-Lieutenant Hayes     HP:100/100 @ Helm
-Chief O'Brien        HP:100/100 @ Engines
-Sergeant Vega        HP:100/100 @ Weapons
-
-Kestrel> power shields 4
-Allocated 4 power to Shields (+2)
-
-Kestrel> assign hayes weapons
-Hayes assigned to Weapons room
-
-Kestrel> wait 10
-Waiting 10 seconds...
-
-Kestrel> exit
-Safe travels, Captain!
+# Unix commands
+ls /sys/ship/systems    # List systems
+cat /dev/ship/hull      # Read hull device
+cat /proc/ship/status   # View ship status
+cat /proc/ship/crew_ai  # View crew AI activity
 ```
 
-## 🎨 Visual Design
+## 🔧 Hacking
 
-Beautiful ASCII/Unicode ship layouts:
-
-```
-           ╔════════════════════════════╗
-           ║      KESTREL CRUISER       ║
-         ╔═╩════════════════════════════╩═╗
-         ║   ┌──────────┬──────────┐     ║
-         ║   │  HELM    │ SHIELDS  │     ║
-         ║   │   🎯     │   🛡️     │     ║
-         ║   │   👤     │   ⚡⚡   │     ║
-    ═══  ║   │  [PILOT] │ [SHIELD] │     ║  ═══
-         ║   └──────────┴──────────┘     ║
-         ╚═╦════════════════════════════╦═╝
-           ║       👤 CORRIDOR          ║
-         ╔═╩════════════════════════════╩═╗
-         ║   ┌──────────┬──────────┐     ║
-         ║   │ WEAPONS  │  OXYGEN  │     ║
-    🔴━━ ║   │  🔴🔴   │   💨     │     ║ ━━🔴
-         ║   │  [WEAPON]│   [O2]   │     ║
-         ║   └──────────┴──────────┘     ║
-         ╚═╦════════════════════════════╦═╝
-         ╔═╩════════════════════════════╩═╗
-         ║   ┌──────────┬──────────┐     ║
-         ║   │ REACTOR  │ ENGINES  │     ║
-         ║   │   ⚡⚡   │   ⚙️⚙️   │     ║
-         ║   └──────────┴──────────┘     ║
-         ╚═══════════════════════════════╝
-```
-
-See `SHIP_DESIGNS.md` for all ship classes!
-
-## 🧪 Testing
-
-Run the automated test suite:
+**Every command is a PooScript file**. View and modify them:
 
 ```bash
-python3 test_main_programs.py
+# View command source
+hack power          # See how power allocation works
+cat /bin/status     # Read the status command
+
+# All commands are in /bin
+ls /bin
+
+# Write your own scripts
+cat > /tmp/autopilot.ps <<EOF
+#!/usr/bin/pooscript
+# Autonomous power management
+
+# Read hull
+hull_fd = kernel.open("/dev/ship/hull", kernel.O_RDONLY)
+hull = int(kernel.read(hull_fd, 1024).decode().strip())
+kernel.close(hull_fd)
+
+# Emergency: boost shields if hull low
+if hull < 15:
+    shield_fd = kernel.open("/sys/ship/systems/shields/power", kernel.O_WRONLY)
+    kernel.write(shield_fd, b"4")
+    kernel.close(shield_fd)
+    print("EMERGENCY: Shields to maximum!")
+EOF
+
+chmod +x /tmp/autopilot.ps
+/tmp/autopilot.ps
 ```
 
-Tests verify:
-- ✅ No crashes
-- ✅ Clean startup and shutdown
-- ✅ All three game modes work
-- ✅ Command-line argument handling
+## 📚 PooScript Examples
 
-## 🛠️ Project Structure
+### Read ship data with kernel syscalls
 
-```
-SpaceCMD/
-├── game.py                 # Roguelike campaign mode
-├── play.py                 # Quick play mode
-├── shipos.py              # Ship OS mode (experimental)
-├── core/
-│   ├── ship.py            # Ship state and systems
-│   ├── crew.py            # Crew management
-│   ├── combat.py          # Combat engine
-│   ├── render.py          # ASCII rendering
-│   ├── game.py            # Game loop
-│   └── ...                # Other modules
-├── test_main_programs.py  # Automated tests
-└── docs/
-    ├── QUICKSTART.md
-    ├── SHIP_DESIGNS.md
-    └── ...
+```python
+#!/usr/bin/pooscript
+# Read hull integrity using kernel syscalls
+
+fd = kernel.open("/dev/ship/hull", kernel.O_RDONLY)
+hull_data = kernel.read(fd, 1024)
+kernel.close(fd)
+
+hull = int(hull_data.decode().strip())
+print(f"Hull integrity: {hull}")
 ```
 
-## 🎯 Current Status
+### Control power allocation
 
-### ✅ Working Features
-- Three different play modes
-- Multiple ship classes (Kestrel, Stealth, Mantis)
-- Crew management and assignment
-- Power allocation system
-- Beautiful ASCII ship rendering
-- Turn-based combat prototype
-- Ship status displays
-- Command-line interface
+```python
+#!/usr/bin/pooscript
+# Set shields to maximum power
 
-### 🚧 In Development
-- Full combat system with enemy AI
-- More weapon types
-- Hull breaches and fire mechanics
-- Oxygen depletion system
-- Enemy ship variety
+# Read current shields
+fd = kernel.open("/sys/ship/systems/shields/power", kernel.O_RDWR)
+current = kernel.read(fd, 1024).decode().strip()
 
-### 📋 Planned
-- Complete sector navigation
-- More random events
-- Merchant shops
-- Ship upgrade system
-- Save/load functionality
-- More ship classes
-- Achievement system
+# Write new power level
+kernel.write(fd, b"3")
+kernel.close(fd)
 
-## 🗺️ Roadmap
+print("Shields at maximum power!")
+```
 
-**Phase 1: Core Gameplay** (Current)
-- ✅ Ship systems and management
-- ✅ Crew assignment
-- ✅ Basic combat
-- ✅ ASCII rendering
-- 🚧 Enemy AI
+### Monitor crew bots
 
-**Phase 2: Combat & Events**
-- Weapon variety (lasers, missiles, beams, ions)
-- Environmental hazards (fire, breaches, oxygen)
-- Random encounter system
-- Enemy ship types
+```python
+#!/usr/bin/pooscript
+# Watch what crew bots are doing
 
-**Phase 3: Progression**
-- Sector navigation
-- Shops and trading
-- Ship upgrades
-- Save/load system
+fd = kernel.open("/proc/ship/crew_ai", kernel.O_RDONLY)
+ai_status = kernel.read(fd, 4096)
+kernel.close(fd)
 
-**Phase 4: Polish**
-- More ships to unlock
-- Achievements
-- Sound effects (terminal beeps!)
-- Tutorial improvements
+print(ai_status.decode())
+```
+
+### List all systems
+
+```python
+#!/usr/bin/pooscript
+# List all systems and their status
+
+systems = kernel.readdir("/sys/ship/systems")
+for system in systems:
+    if system not in [".", ".."]:
+        fd = kernel.open(f"/sys/ship/systems/{system}/status", kernel.O_RDONLY)
+        status = kernel.read(fd, 1024).decode()
+        kernel.close(fd)
+        print(status.strip())
+```
+
+## 🎯 Architecture
+
+SpaceCMD is built on a layered architecture:
+
+```
+┌─────────────────────────────────────┐
+│     Game UI (Terminal/LCARS)        │
+├─────────────────────────────────────┤
+│      PooScript Shell & Commands     │
+├─────────────────────────────────────┤
+│     ShipOS (Unix-like System)       │
+│  ┌──────────┬──────────┬──────────┐ │
+│  │   VFS    │ Process  │  Kernel  │ │
+│  │          │  Manager │ Syscalls │ │
+│  └──────────┴──────────┴──────────┘ │
+├─────────────────────────────────────┤
+│   Autonomous Crew AI + Ship Physics │
+└─────────────────────────────────────┘
+```
+
+### Components
+
+- **ShipOS**: Complete Unix-like OS with VFS, processes, permissions
+- **PooScript**: Safe Python-subset scripting language
+- **Kernel**: Syscall interface (`open`, `read`, `write`, `readdir`)
+- **Device Files**: Ship hardware exposed as character devices
+- **Crew AI**: Autonomous bots that manage repairs and emergencies
+- **Ship Systems**: Physics simulation for power, damage, combat
+
+## 🎨 Ships Available
+
+- **Kestrel**: Balanced human cruiser (recommended for beginners)
+- **Stealth**: Advanced ship with cloaking, no shields (hard mode)
+- **Mantis**: Boarding ship with teleporter, strong crew (aggressive)
+
+## 🌟 What Makes This Special?
+
+Unlike other spaceship sims, SpaceCMD gives you **complete control** through a real scripting interface:
+
+1. **Real Unix System**: Not a fake shell - actual VFS, processes, syscalls
+2. **Hackable Commands**: Every command is PooScript you can modify
+3. **Device Files**: Ship hardware as `/dev` devices like a real OS
+4. **Kernel API**: Use syscalls like `kernel.open()` for low-level access
+5. **Autonomous Crew**: AI bots handle repairs so you focus on tactics
+6. **Everything Scriptable**: Automate ship operations with PooScript
+
+## 📖 Advanced Topics
+
+### Writing Custom Commands
+
+Create your own command in `/bin`:
+
+```bash
+# Create a custom command
+cat > /bin/shields_max <<'EOF'
+#!/usr/bin/pooscript
+# Maximize shield power
+
+fd = kernel.open("/sys/ship/systems/shields/power", kernel.O_WRONLY)
+kernel.write(fd, b"4")
+kernel.close(fd)
+print("SHIELDS AT MAXIMUM!")
+EOF
+
+chmod +x /bin/shields_max
+shields_max
+```
+
+### Accessing Ship State
+
+All ship data is accessible through device files:
+
+```python
+# Read various ship metrics
+hull_fd = kernel.open("/dev/ship/hull", kernel.O_RDONLY)
+shields_fd = kernel.open("/dev/ship/shields", kernel.O_RDONLY)
+fuel_fd = kernel.open("/dev/ship/fuel", kernel.O_RDONLY)
+
+hull = kernel.read(hull_fd, 1024)
+shields = kernel.read(shields_fd, 1024)
+fuel = kernel.read(fuel_fd, 1024)
+
+kernel.close(hull_fd)
+kernel.close(shields_fd)
+kernel.close(fuel_fd)
+```
+
+### Sysfs Attributes
+
+Like Linux's `/sys`, ship systems have attribute files:
+
+```bash
+# Each system has attributes
+ls /sys/ship/systems/engines/
+# status  power  health
+
+# Read attributes
+cat /sys/ship/systems/engines/power  # Current power
+cat /sys/ship/systems/engines/health # Health percentage
+cat /sys/ship/systems/engines/status # Online/offline status
+
+# Write attributes (where supported)
+echo 3 > /sys/ship/systems/engines/power  # Set engine power
+```
+
+### Crew Bot AI
+
+Crew bots use a priority system:
+
+1. **Fire suppression** (highest priority)
+2. **Critical repairs** (systems below 50% health)
+3. **Oxygen monitoring** (rooms below 80%)
+4. **System operation** (normal duty)
+
+View bot decisions in real-time:
+```bash
+watch -n 1 'cat /proc/ship/crew_ai'
+```
 
 ## 🤝 Contributing
 
-Contributions welcome! SpaceCMD is open source under GPL-3.0.
-
-Ways to contribute:
-- Add new ship designs
-- Create new events
-- Design weapons
-- Improve AI
-- Write documentation
-- Report bugs
-
-## 📚 Documentation
-
-- **QUICKSTART.md** - Get started in 5 minutes
-- **SHIP_DESIGNS.md** - All ship classes and stats
-- **PLAY_MODES.md** - Different ways to play
-- **SHIPOS_GUIDE.md** - Ship OS mode guide (experimental)
-- **TESTING_README.md** - Testing and development
+This is an experimental project exploring **operating systems as game interfaces**. Contributions welcome!
 
 ## 📜 License
 
-**GPL-3.0 License**
+GPL-3.0 License
 
-Copyright (C) 2025 David Hamner
+## 🎮 Author
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+David Hamner - Exploring the intersection of operating systems, scripting languages, and game design.
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>.
-
-## 🙏 Credits
-
-**Author:** David Hamner
-
-**Inspired by:**
-- FTL: Faster Than Light by Subset Games
-- Classic roguelikes (Rogue, NetHack, DCSS)
-- Terminal-based games and ASCII art tradition
-
-**Built for:**
-- Roguelike fans
-- FTL players
-- Terminal enthusiasts
-- Space sim lovers
-- Anyone who wants to command a spaceship from the CLI
-
-## 🔗 Links
-
-- **Repository:** https://github.com/ruapotato/SpaceCMD
-- **Issues:** https://github.com/ruapotato/SpaceCMD/issues
-- **Discussions:** https://github.com/ruapotato/SpaceCMD/discussions
-
-## 🎮 Tips for New Players
-
-1. **Start with the tutorial** - `python3 game.py` includes a tutorial
-2. **Manage power carefully** - You never have enough!
-3. **Watch your oxygen** - Keep O2 powered or crew suffocates
-4. **Position crew wisely** - They provide bonuses to systems
-5. **Target tactically** - Hit enemy weapons to stop their attacks
-6. **Don't neglect engines** - Evasion saves hull integrity
-7. **Pause is your friend** - Take time to think in combat
+GitHub: https://github.com/ruapotato/SpaceCMD
 
 ---
 
-**Ready to command your ship? Launch now!**
-
-```bash
-python3 game.py
-```
-
-⭐ Star the repo if you enjoy the game!
-
-Built with ❤️ for the terminal.
+**"Everything is a file. Everything is hackable. Crew are autonomous bots. Welcome aboard, Captain."**

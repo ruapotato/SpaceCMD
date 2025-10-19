@@ -1,48 +1,28 @@
 #!/usr/bin/pooscript
-# Display crew roster from /sys/ship/crew
+# Display autonomous crew bot status
 
 print("=" * 60)
-print("CREW ROSTER")
+print("AUTONOMOUS CREW BOTS")
 print("=" * 60)
 
 try:
-    # Read crew from sysfs
-    crew_list = kernel.readdir("/sys/ship/crew")
+    # Read crew AI status from procfs
+    ai_fd = kernel.open("/proc/ship/crew_ai", kernel.O_RDONLY)
+    ai_status = kernel.read(ai_fd, 4096).decode('utf-8')
+    kernel.close(ai_fd)
 
-    for crew_member in crew_list:
-        if crew_member in [".", ".."]:
-            continue
+    print(ai_status.strip())
 
-        # Read crew attributes via kernel syscalls
-        name_fd = kernel.open(f"/sys/ship/crew/{crew_member}/name", kernel.O_RDONLY)
-        name = kernel.read(name_fd, 1024).decode('utf-8').strip()
-        kernel.close(name_fd)
-
-        race_fd = kernel.open(f"/sys/ship/crew/{crew_member}/race", kernel.O_RDONLY)
-        race = kernel.read(race_fd, 1024).decode('utf-8').strip()
-        kernel.close(race_fd)
-
-        health_fd = kernel.open(f"/sys/ship/crew/{crew_member}/health", kernel.O_RDONLY)
-        health = kernel.read(health_fd, 1024).decode('utf-8').strip()
-        kernel.close(health_fd)
-
-        location_fd = kernel.open(f"/sys/ship/crew/{crew_member}/location", kernel.O_RDONLY)
-        location = kernel.read(location_fd, 1024).decode('utf-8').strip()
-        kernel.close(location_fd)
-
-        # Health status
-        health_val = int(health)
-        if health_val > 70:
-            status = "HEALTHY"
-        elif health_val > 30:
-            status = "INJURED"
-        else:
-            status = "CRITICAL"
-
-        print(f"{name:20} ({race:8}) HP:{health:>3}/100 [{status:8}] @ {location}")
-
+    print()
+    print("Crew bots automatically handle:")
+    print("  - System repairs when damaged")
+    print("  - Fire suppression")
+    print("  - Oxygen level monitoring")
+    print("  - System operation")
+    print()
+    print("No manual assignment needed - bots manage themselves!")
     print("=" * 60)
 
 except Exception as e:
-    error(f"Failed to read crew: {e}")
+    error(f"Failed to read crew AI: {e}")
     exit(1)
