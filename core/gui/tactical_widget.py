@@ -209,12 +209,6 @@ class TacticalWidget:
             # Add to target room
             target_room.crew.append(crew_name)
 
-            # Update crew_positions list
-            for i, (x, y, name) in enumerate(self.player_ship.crew_positions):
-                if name == crew_name:
-                    self.player_ship.crew_positions[i] = (target_room.x, target_room.y, name)
-                    break
-
             self.log_command(f"✓ {crew_name} moved to {target_room_name}")
         elif not current_room:
             self.log_command(f"✗ Error: {crew_name} not found")

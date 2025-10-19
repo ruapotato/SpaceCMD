@@ -273,6 +273,8 @@ class TerminalWidget:
                 # Force cursor to be visible when typing
                 self.cursor_visible = True
                 self.cursor_blink_time = 0
+                # Debug output
+                print(f"DEBUG: Typed '{event.unicode}' - input_line: '{self.input_line}' - cursor_pos: {self.cursor_pos}")
                 return True
 
         # Scroll wheel
@@ -311,10 +313,10 @@ class TerminalWidget:
             pygame.Surface: Rendered terminal surface
         """
         # Create surface if needed
-        if not self.surface or self.surface.get_size() != (self.width, self.height):
+        if self.surface is None or self.surface.get_size() != (self.width, self.height):
             self.surface = pygame.Surface((self.width, self.height))
 
-        # Clear surface
+        # ALWAYS clear and redraw the entire surface
         self.surface.fill(TERMINAL_BG)
 
         if not Theme.FONT_TERMINAL:
