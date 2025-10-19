@@ -1,0 +1,28 @@
+#!/usr/bin/pooscript
+# List all ship systems from /sys/ship/systems
+
+print("=" * 60)
+print("SHIP SYSTEMS")
+print("=" * 60)
+
+try:
+    # Read systems from sysfs
+    systems_fd = kernel.open("/sys/ship/systems", kernel.O_RDONLY)
+    systems = kernel.readdir("/sys/ship/systems")
+
+    for system in systems:
+        if system in [".", ".."]:
+            continue
+
+        # Read system status via kernel
+        status_fd = kernel.open(f"/sys/ship/systems/{system}/status", kernel.O_RDONLY)
+        status = kernel.read(status_fd, 1024).decode('utf-8').strip()
+        kernel.close(status_fd)
+
+        print(f"  {status}")
+
+    print("=" * 60)
+
+except Exception as e:
+    error(f"Failed to read systems: {e}")
+    exit(1)

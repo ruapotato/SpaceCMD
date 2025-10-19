@@ -1,0 +1,4 @@
+#!/usr/bin/pooscript
+# Print working directory
+
+print(process.getcwd_path())

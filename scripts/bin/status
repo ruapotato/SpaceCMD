@@ -1,0 +1,16 @@
+#!/usr/bin/pooscript
+# Display complete ship status from /proc/ship/status
+
+# Read ship status from procfs (like cat /proc/cpuinfo)
+try:
+    fd = kernel.open("/proc/ship/status", kernel.O_RDONLY)
+    status = kernel.read(fd, 4096).decode('utf-8')
+    kernel.close(fd)
+
+    print("=" * 60)
+    print(status.strip())
+    print("=" * 60)
+
+except Exception as e:
+    error(f"Failed to read ship status: {e}")
+    exit(1)

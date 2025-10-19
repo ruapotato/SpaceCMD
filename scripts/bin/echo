@@ -1,0 +1,4 @@
+#!/usr/bin/pooscript
+# Echo arguments to stdout
+
+print(' '.join(args))

@@ -1,0 +1,37 @@
+#!/usr/bin/pooscript
+# Toggle room venting - writes to /sys/ship/rooms/<room>/venting
+
+if len(args) < 1:
+    error("Usage: vent <room_name>")
+    error("Example: vent helm")
+    exit(1)
+
+room = args[0]
+room_path = f"/sys/ship/rooms/{room}/venting"
+
+try:
+    # Read current venting state via kernel
+    fd = kernel.open(room_path, kernel.O_RDWR)
+    current = kernel.read(fd, 1024).decode('utf-8').strip()
+
+    # Toggle the state
+    new_value = "0" if current == "1" else "1"
+
+    # Write new state to sysfs (kernel validates and applies)
+    bytes_written = kernel.write(fd, new_value.encode('utf-8'))
+    kernel.close(fd)
+
+    if bytes_written > 0:
+        if new_value == "1":
+            print(f"Opening airlocks in {room} - VENTING!")
+            print(f"WARNING: Any crew in {room} will be exposed to vacuum!")
+        else:
+            print(f"Closing airlocks in {room}")
+    else:
+        error(f"Failed to toggle venting")
+        exit(1)
+
+except Exception as e:
+    error(f"Failed to toggle venting: {e}")
+    error(f"Available rooms: {' '.join([r for r in kernel.readdir('/sys/ship/rooms') if r not in ['.', '..']])}")
+    exit(1)

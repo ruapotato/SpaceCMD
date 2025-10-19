@@ -1,0 +1,52 @@
+#!/usr/bin/pooscript
+# Hacker's toolkit - edit and modify any command!
+
+if len(args) < 1:
+    print("=" * 60)
+    print("HACKER'S TOOLKIT")
+    print("=" * 60)
+    print()
+    print("This is PooScript OS - EVERYTHING is hackable!")
+    print()
+    print("Usage: hack <command_name>")
+    print()
+    print("View any command's source:")
+    print("  hack status     - See how status works")
+    print("  hack power      - See how power allocation works")
+    print("  hack ls         - See how ls is implemented")
+    print()
+    print("All commands are in /bin/ as PooScript files.")
+    print("Read them with: cat /bin/<command>")
+    print()
+    print("Tips:")
+    print("  - Every command is a PooScript you can read")
+    print("  - Ship state is in /ship/, /systems/, /crew/, /rooms/")
+    print("  - Use kernel.open/read/write for low-level access")
+    print("  - Modify commands to add features or exploits!")
+    print("=" * 60)
+    exit(0)
+
+command = args[0]
+
+# Find the command
+command_path = f"/bin/{command}"
+
+try:
+    # Read command source via kernel
+    fd = kernel.open(command_path, kernel.O_RDONLY)
+    source = kernel.read(fd, 65536).decode('utf-8')
+    kernel.close(fd)
+
+    print("=" * 60)
+    print(f"SOURCE: {command_path}")
+    print("=" * 60)
+    print(source)
+    print("=" * 60)
+    print()
+    print(f"HACK IT: This is the actual source of '{command}'")
+    print(f"In a real game, you could modify this to change behavior!")
+
+except Exception as e:
+    error(f"Command not found: {command}")
+    error(f"Try: ls /bin")
+    exit(1)

@@ -1,0 +1,15 @@
+#!/usr/bin/pooscript
+# Concatenate and print files
+
+if len(args) == 0:
+    # Read from stdin
+    print(stdin, end='')
+else:
+    # Read from files
+    for filename in args:
+        try:
+            content = vfs.read(filename)
+            print(content, end='')
+        except Exception as e:
+            error(f"cat: {filename}: {e}")
+            exit(1)

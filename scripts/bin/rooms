@@ -1,0 +1,50 @@
+#!/usr/bin/pooscript
+# Display room status from /sys/ship/rooms
+
+print("=" * 60)
+print("ROOM STATUS")
+print("=" * 60)
+
+try:
+    rooms = kernel.readdir("/sys/ship/rooms")
+    for room in rooms:
+        if room in [".", ".."]:
+            continue
+
+        # Read room attributes via kernel syscalls
+        oxygen_fd = kernel.open(f"/sys/ship/rooms/{room}/oxygen", kernel.O_RDONLY)
+        oxygen = kernel.read(oxygen_fd, 1024).decode('utf-8').strip()
+        kernel.close(oxygen_fd)
+
+        fire_fd = kernel.open(f"/sys/ship/rooms/{room}/fire", kernel.O_RDONLY)
+        fire = kernel.read(fire_fd, 1024).decode('utf-8').strip()
+        kernel.close(fire_fd)
+
+        breach_fd = kernel.open(f"/sys/ship/rooms/{room}/breach", kernel.O_RDONLY)
+        breach = kernel.read(breach_fd, 1024).decode('utf-8').strip()
+        kernel.close(breach_fd)
+
+        venting_fd = kernel.open(f"/sys/ship/rooms/{room}/venting", kernel.O_RDONLY)
+        venting = kernel.read(venting_fd, 1024).decode('utf-8').strip()
+        kernel.close(venting_fd)
+
+        oxygen_pct = int(float(oxygen) * 100)
+
+        # Status indicators
+        indicators = []
+        if fire == "1":
+            indicators.append("FIRE!")
+        if breach == "1":
+            indicators.append("BREACH!")
+        if venting == "1":
+            indicators.append("VENTING!")
+
+        status_str = " ".join(indicators) if indicators else "OK"
+
+        print(f"{room:15} O2:{oxygen_pct:3}% {status_str}")
+
+    print("=" * 60)
+
+except Exception as e:
+    error(f"Failed to read rooms: {e}")
+    exit(1)

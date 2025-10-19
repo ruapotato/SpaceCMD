@@ -1,0 +1,36 @@
+#!/usr/bin/pooscript
+# Display first lines of a file
+
+lines_to_show = 10
+
+# Parse arguments
+files = []
+for arg in args:
+    if arg.startswith('-'):
+        try:
+            lines_to_show = int(arg[1:])
+        except:
+            pass
+    else:
+        files.append(arg)
+
+if len(files) == 0:
+    # Read from stdin
+    lines = stdin.split('\n')
+    for i, line in enumerate(lines):
+        if i >= lines_to_show:
+            break
+        print(line)
+else:
+    # Read from files
+    for filename in files:
+        try:
+            content = vfs.read(filename)
+            lines = content.split('\n')
+            for i, line in enumerate(lines):
+                if i >= lines_to_show:
+                    break
+                print(line)
+        except Exception as e:
+            error(f"head: {filename}: {e}")
+            exit(1)

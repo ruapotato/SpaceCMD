@@ -1,0 +1,48 @@
+#!/usr/bin/pooscript
+# Display crew roster from /sys/ship/crew
+
+print("=" * 60)
+print("CREW ROSTER")
+print("=" * 60)
+
+try:
+    # Read crew from sysfs
+    crew_list = kernel.readdir("/sys/ship/crew")
+
+    for crew_member in crew_list:
+        if crew_member in [".", ".."]:
+            continue
+
+        # Read crew attributes via kernel syscalls
+        name_fd = kernel.open(f"/sys/ship/crew/{crew_member}/name", kernel.O_RDONLY)
+        name = kernel.read(name_fd, 1024).decode('utf-8').strip()
+        kernel.close(name_fd)
+
+        race_fd = kernel.open(f"/sys/ship/crew/{crew_member}/race", kernel.O_RDONLY)
+        race = kernel.read(race_fd, 1024).decode('utf-8').strip()
+        kernel.close(race_fd)
+
+        health_fd = kernel.open(f"/sys/ship/crew/{crew_member}/health", kernel.O_RDONLY)
+        health = kernel.read(health_fd, 1024).decode('utf-8').strip()
+        kernel.close(health_fd)
+
+        location_fd = kernel.open(f"/sys/ship/crew/{crew_member}/location", kernel.O_RDONLY)
+        location = kernel.read(location_fd, 1024).decode('utf-8').strip()
+        kernel.close(location_fd)
+
+        # Health status
+        health_val = int(health)
+        if health_val > 70:
+            status = "HEALTHY"
+        elif health_val > 30:
+            status = "INJURED"
+        else:
+            status = "CRITICAL"
+
+        print(f"{name:20} ({race:8}) HP:{health:>3}/100 [{status:8}] @ {location}")
+
+    print("=" * 60)
+
+except Exception as e:
+    error(f"Failed to read crew: {e}")
+    exit(1)

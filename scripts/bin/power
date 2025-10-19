@@ -1,0 +1,62 @@
+#!/usr/bin/pooscript
+# Power allocation utility - uses /sys/ship/systems and kernel syscalls
+
+if len(args) == 0:
+    # Show power usage from sysfs
+    print("=" * 60)
+    print("POWER ALLOCATION")
+    print("=" * 60)
+
+    systems = kernel.readdir("/sys/ship/systems")
+    for system in systems:
+        if system in [".", ".."]:
+            continue
+
+        # Read system stats via kernel
+        power_fd = kernel.open(f"/sys/ship/systems/{system}/power", kernel.O_RDONLY)
+        power = kernel.read(power_fd, 1024).decode('utf-8').strip()
+        kernel.close(power_fd)
+
+        health_fd = kernel.open(f"/sys/ship/systems/{system}/health", kernel.O_RDONLY)
+        health = kernel.read(health_fd, 1024).decode('utf-8').strip()
+        kernel.close(health_fd)
+
+        health_pct = int(float(health) * 100)
+        print(f"  {system:12} PWR:{power:1} HP:{health_pct:3}%")
+
+    # Read ship power from procfs
+    power_fd = kernel.open("/proc/ship/power", kernel.O_RDONLY)
+    power_info = kernel.read(power_fd, 1024).decode('utf-8')
+    kernel.close(power_fd)
+
+    print("=" * 60)
+    print(power_info.strip())
+    print("=" * 60)
+
+elif len(args) >= 2:
+    # Set power using kernel write syscall to sysfs
+    system = args[0]
+    amount = args[1]
+
+    try:
+        # Open sysfs power attribute for writing
+        fd = kernel.open(f"/sys/ship/systems/{system}/power", kernel.O_WRONLY)
+
+        # Write new power level
+        bytes_written = kernel.write(fd, amount.encode('utf-8'))
+        kernel.close(fd)
+
+        if bytes_written > 0:
+            print(f"Set {system} power to {amount}")
+        else:
+            error(f"Failed to set power (insufficient power available?)")
+            exit(1)
+
+    except Exception as e:
+        error(f"Failed to set power: {e}")
+        error(f"Available systems: {' '.join([s for s in kernel.readdir('/sys/ship/systems') if s not in ['.', '..']])}")
+        exit(1)
+else:
+    error("Usage: power [system] [amount]")
+    error("       power          - show current allocation")
+    exit(1)

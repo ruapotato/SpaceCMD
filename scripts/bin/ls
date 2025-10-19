@@ -1,0 +1,51 @@
+#!/usr/bin/pooscript
+# List directory contents
+
+# Parse arguments
+show_all = False
+long_format = False
+target_path = None
+
+for arg in args:
+    if arg.startswith('-'):
+        if 'a' in arg:
+            show_all = True
+        if 'l' in arg:
+            long_format = True
+    else:
+        target_path = arg
+
+# Default to current directory
+if target_path is None:
+    target_path = process.getcwd_path()
+
+# List directory
+try:
+    if long_format:
+        # Long format with details
+        entries = vfs.listdetail(target_path)
+        for entry in entries:
+            if not show_all and entry['name'].startswith('.'):
+                continue
+
+            # Format file type and permissions
+            filetype = get_filetype_char(entry['mode'])
+            perms = format_mode(entry['mode'])
+
+            # Format size
+            size = str(entry['size'])
+
+            # Format time
+            time_str = format_time(entry['mtime'])
+
+            print(f"{filetype}{perms} {entry['nlink']:2} {entry['uid']:4} {entry['gid']:4} {size:8} {time_str} {entry['name']}")
+    else:
+        # Simple format
+        entries = vfs.list(target_path)
+        for name in entries:
+            if not show_all and name.startswith('.'):
+                continue
+            print(name)
+except Exception as e:
+    error(f"ls: cannot access '{target_path}': {e}")
+    exit(1)
