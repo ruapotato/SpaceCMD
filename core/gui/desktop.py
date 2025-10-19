@@ -10,6 +10,7 @@ import random
 from typing import List, Optional
 from .window import Window, WindowState
 from .themes import Theme, draw_rounded_rect
+from .topbar import TopBar
 
 
 class Star:
@@ -173,6 +174,7 @@ class Desktop:
         self.focused_window: Optional[Window] = None
 
         # Desktop elements
+        self.topbar = None  # Will be set when ship_os is available
         self.taskbar = Taskbar(width, height)
 
         # Starfield background
@@ -188,6 +190,9 @@ class Desktop:
         self.menu_open = False
         self.menu_rect = pygame.Rect(4, height - Theme.TASKBAR_HEIGHT - 200, 150, 200)
 
+        # ShipOS reference (will be set by play.py)
+        self.ship_os = None
+
     def _create_starfield(self, count):
         """Create starfield with random stars"""
         stars = []
@@ -197,6 +202,16 @@ class Desktop:
             z = random.uniform(0.1, 1.0)
             stars.append(Star(x, y, z, self.width, self.height))
         return stars
+
+    def set_ship_os(self, ship_os):
+        """
+        Set the ShipOS instance and create top bar.
+
+        Args:
+            ship_os: ShipOS instance
+        """
+        self.ship_os = ship_os
+        self.topbar = TopBar(self.width, self.height, ship_os)
 
     def add_window(self, window: Window):
         """Add a window to the desktop"""
@@ -335,6 +350,10 @@ class Desktop:
         for star in self.stars:
             star.update(self.warp_speed)
 
+        # Update top bar
+        if self.topbar:
+            self.topbar.update(dt)
+
         # Update windows
         for window in self.windows:
             window.update(dt)
@@ -345,7 +364,11 @@ class Desktop:
         # Handle maximize state
         for window in self.windows:
             if window.state == WindowState.MAXIMIZED and window.saved_rect:
-                window.maximize(self.width, self.height, Theme.TASKBAR_HEIGHT)
+                # Account for both top bar and taskbar
+                available_height = self.height - Theme.TASKBAR_HEIGHT
+                if self.topbar:
+                    available_height -= self.topbar.height
+                window.maximize(self.width, available_height, Theme.TASKBAR_HEIGHT)
 
     def render(self):
         """Render the desktop"""
@@ -361,6 +384,10 @@ class Desktop:
                     self.screen.set_at((x, y), color)
                 else:
                     pygame.draw.circle(self.screen, color, (x, y), size)
+
+        # Render top bar
+        if self.topbar:
+            self.topbar.render(self.screen)
 
         # Render windows (in z-order)
         for window in self.windows:

@@ -51,8 +51,8 @@ def run_gui_mode(ship_type=None):
     # Create desktop environment
     desktop = Desktop(width=1280, height=800, fullscreen=False)
 
-    # Store ship_os in desktop for all terminals to share
-    desktop.ship_os = ship_os
+    # Set ship_os in desktop (creates top bar with system monitor)
+    desktop.set_ship_os(ship_os)
 
     # Override desktop's create_terminal_window to integrate with ShipOS
     original_create_terminal = desktop.create_terminal_window
@@ -99,11 +99,12 @@ def run_gui_mode(ship_type=None):
     # Replace the method
     desktop.create_terminal_window = create_shipos_terminal
 
-    # Create initial terminal
-    desktop.create_terminal_window("Ship Terminal", 50, 50)
+    # Create initial terminal (offset from top bar)
+    topbar_height = desktop.topbar.height if desktop.topbar else 32
+    desktop.create_terminal_window("Ship Terminal", 50, topbar_height + 20)
 
     # Create tactical display
-    desktop.create_tactical_window("Tactical Display", 600, 50)
+    desktop.create_tactical_window("Tactical Display", 600, topbar_height + 20)
 
     # Make stars static (they'll move when ship moves)
     desktop.warp_speed = 0

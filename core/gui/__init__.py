@@ -9,5 +9,6 @@ from .desktop import Desktop
 from .window import Window
 from .terminal_widget import TerminalWidget
 from .tactical_widget import TacticalWidget
+from .topbar import TopBar
 
-__all__ = ['Desktop', 'Window', 'TerminalWidget', 'TacticalWidget']
+__all__ = ['Desktop', 'Window', 'TerminalWidget', 'TacticalWidget', 'TopBar']
