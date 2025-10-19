@@ -20,14 +20,18 @@ def run_gui_mode(ship_type=None):
         ship_type: Optional ship type to start with
     """
     from core.gui import Desktop
-    from core.system import UnixSystem
+    from core.ship_os import ShipOS
+    from core.ships import create_ship
 
     print("Starting SpaceCMD Desktop Environment...")
     print("Booting ShipOS...")
     print("")
 
-    # Create ShipOS instance
-    ship_os = UnixSystem(hostname=ship_type or "kestrel", ip_or_interfaces={'eth0': '192.168.1.10'})
+    # Create ship first
+    ship = create_ship(ship_type or "kestrel")
+
+    # Create ShipOS instance with ship
+    ship_os = ShipOS(ship=ship)
 
     # Boot the system
     ship_os.boot(verbose=False)

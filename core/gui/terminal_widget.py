@@ -319,24 +319,26 @@ class TerminalWidget:
         if not Theme.FONT_TERMINAL:
             return self.surface
 
-        # Calculate visible lines
+        # Calculate visible lines (reserve space for input at bottom)
         visible_lines = self.rows - 1  # Reserve one line for input
+
+        # Input line is ALWAYS at the bottom
+        input_y = self.height - self.char_height - 4
 
         # Get buffer content
         total_lines = len(self.buffer)
 
-        # When scroll_offset is 0, show the most recent lines
-        # When scroll_offset > 0, we're scrolled back in history
+        # Calculate which buffer lines to show (fill space above input)
         if self.scroll_offset == 0:
-            # Show most recent lines
+            # Show most recent lines (bottom of buffer)
             start_line = max(0, total_lines - visible_lines)
             end_line = total_lines
         else:
-            # Scrolled back
+            # Scrolled back - show older lines
             start_line = max(0, total_lines - visible_lines - self.scroll_offset)
             end_line = max(0, total_lines - self.scroll_offset)
 
-        # Render buffer lines
+        # Render buffer lines (fills space above input)
         y = 0
         for i in range(start_line, end_line):
             if i < len(self.buffer):
@@ -349,9 +351,6 @@ class TerminalWidget:
                 text_surface = Theme.FONT_TERMINAL.render(line, True, TERMINAL_FG)
                 self.surface.blit(text_surface, (4, y))
                 y += self.char_height
-
-        # Render input line right after buffer content
-        input_y = y
 
         # Draw a subtle background for the input line to make it stand out
         input_bg_rect = pygame.Rect(0, input_y - 2, self.width, self.char_height + 6)
