@@ -59,6 +59,10 @@ def create_gnat() -> Ship:
     laser.charge = 1.0  # START FULLY CHARGED!
     ship.add_weapon(laser)
 
+    # Very fast - hard to hit, tries to get close
+    ship.max_speed = 3.0
+    ship.speed = 3.0
+
     return ship
 
 
@@ -129,6 +133,10 @@ def create_pirate_scout() -> Ship:
     laser.charge = 1.0  # Ready to fire immediately
     ship.add_weapon(laser)
 
+    # Medium speed
+    ship.max_speed = 2.0
+    ship.speed = 2.0
+
     return ship
 
 
@@ -192,6 +200,10 @@ def create_mantis_fighter() -> Ship:
     laser = create_weapon("basic_laser")
     laser.charge = 1.0  # Ready to fire immediately
     ship.add_weapon(laser)
+
+    # Very fast - aggressive pursuit
+    ship.max_speed = 3.5
+    ship.speed = 3.5
 
     return ship
 
@@ -257,6 +269,10 @@ def create_rebel_fighter() -> Ship:
     burst = create_weapon("burst_laser_ii")
     burst.charge = 1.0  # Ready to fire immediately
     ship.add_weapon(burst)
+
+    # Slower but powerful
+    ship.max_speed = 1.5
+    ship.speed = 1.5
 
     return ship
 

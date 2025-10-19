@@ -33,6 +33,11 @@ class CombatState:
         self.player_target = None  # Which enemy system to target
         self.enemy_target = None  # Which player system enemy targets
 
+        # Combat distance (units between ships)
+        self.combat_distance = 5.0  # Start at medium range
+        self.min_distance = 0.5
+        self.max_distance = 10.0
+
         # Combat log
         self.log: List[str] = []
 
@@ -79,10 +84,45 @@ class CombatState:
             if targets:
                 self.enemy_target = random.choice(targets).name
 
+        # Enemy movement AI: Use speed to pursue or maintain range
+        if self.enemy_ship.weapons:
+            # Find weapon with shortest range
+            min_weapon_range = min(w.range for w in self.enemy_ship.weapons)
+
+            # Calculate speed differential (negative = enemy is faster)
+            speed_diff = self.player_ship.speed - self.enemy_ship.speed
+
+            # If we're too far, move closer
+            if self.combat_distance > min_weapon_range * 0.9:
+                # Enemy tries to close distance using speed advantage
+                # Faster ships close distance automatically
+                enemy_advance_rate = self.enemy_ship.speed * dt
+                player_retreat_rate = self.player_ship.speed * dt * 0.3  # Player can partially counter
+
+                net_closing = enemy_advance_rate - player_retreat_rate
+
+                if net_closing > 0:
+                    old_dist = self.combat_distance
+                    self.combat_distance = max(self.min_distance, self.combat_distance - net_closing)
+                    if old_dist != self.combat_distance and abs(old_dist - self.combat_distance) > 0.1:
+                        self.log_event(f"Enemy pursuing: {old_dist:.1f} → {self.combat_distance:.1f} units")
+
+            # If player is trying to escape and is faster, they can pull away
+            elif speed_diff > 0.5:
+                # Player is significantly faster - can create distance
+                escape_rate = speed_diff * dt * 0.5
+                if random.random() < 0.3:  # 30% chance per update to escape slightly
+                    old_dist = self.combat_distance
+                    self.combat_distance = min(self.max_distance, self.combat_distance + escape_rate)
+                    if old_dist != self.combat_distance and abs(old_dist - self.combat_distance) > 0.1:
+                        self.log_event(f"Outmaneuvering enemy: {old_dist:.1f} → {self.combat_distance:.1f} units")
+
         # Fire enemy weapons when ready
         for weapon in self.enemy_ship.weapons:
             if weapon.is_ready():
-                self._fire_weapon(self.enemy_ship, self.player_ship, weapon, self.enemy_target)
+                # Only try to fire if in range
+                if self.combat_distance <= weapon.range:
+                    self._fire_weapon(self.enemy_ship, self.player_ship, weapon, self.enemy_target)
 
     def fire_player_weapon(self, weapon_index: int) -> bool:
         """
@@ -95,11 +135,46 @@ class CombatState:
         weapon = self.player_ship.weapons[weapon_index]
         return self._fire_weapon(self.player_ship, self.enemy_ship, weapon, self.player_target)
 
+    def move_closer(self) -> bool:
+        """
+        Player ship attempts to move closer to enemy.
+        Returns True if successful.
+        """
+        if self.combat_distance <= self.min_distance:
+            return False
+
+        # Move 1 unit closer
+        old_distance = self.combat_distance
+        self.combat_distance = max(self.min_distance, self.combat_distance - 1.0)
+        self.log_event(f"Moving closer: {old_distance:.1f} → {self.combat_distance:.1f} units")
+        return True
+
+    def move_away(self) -> bool:
+        """
+        Player ship attempts to move away from enemy.
+        Returns True if successful.
+        """
+        if self.combat_distance >= self.max_distance:
+            return False
+
+        # Move 1 unit away
+        old_distance = self.combat_distance
+        self.combat_distance = min(self.max_distance, self.combat_distance + 1.0)
+        self.log_event(f"Moving away: {old_distance:.1f} → {self.combat_distance:.1f} units")
+        return True
+
     def _fire_weapon(self, attacker: Ship, defender: Ship, weapon: Weapon, target_room_name: Optional[str]) -> bool:
         """
         Fire a weapon from attacker at defender.
         """
         if not weapon.fire():
+            return False
+
+        # Check range
+        if self.combat_distance > weapon.range:
+            attacker_name = "You" if attacker == self.player_ship else attacker.name
+            self.log_event(f"{attacker_name}: {weapon.name} out of range! ({self.combat_distance:.1f}/{weapon.range:.1f})")
+            # Still consume the charge
             return False
 
         # Check missiles

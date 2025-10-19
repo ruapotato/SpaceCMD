@@ -182,6 +182,19 @@ class MapWidgetV2:
 
         return (x, y)
 
+    def _get_ship_screen_pos(self):
+        """Get screen position for ship based on current node"""
+        if not self.world_manager or not self.ship_os:
+            return None
+
+        # Get the current node the ship is at
+        current_node = self.world_manager.world_map.get_current_node()
+        if not current_node:
+            return None
+
+        # Use the node's actual position (this is accurate and updates correctly)
+        return self._get_node_screen_pos(current_node)
+
     def update(self, dt):
         """Update widget state"""
         # Auto-center on current node for spiral galaxy
@@ -373,10 +386,76 @@ class MapWidgetV2:
                 label_rect = label.get_rect(center=(nx, ny + self.node_radius + 10))
                 self.surface.blit(label, label_rect)
 
+        # Draw ship position indicator
+        self._render_ship_indicator()
+
         # Draw info panel at bottom
         self._render_info_panel()
 
         return self.surface
+
+    def _render_ship_indicator(self):
+        """Draw the ship's position on the galaxy map"""
+        ship_pos = self._get_ship_screen_pos()
+        if not ship_pos:
+            return
+
+        sx, sy = ship_pos
+
+        # Skip if off-screen
+        if sx < -50 or sx > self.width + 50 or sy < -50 or sy > self.height + 50:
+            return
+
+        # Draw ship as a distinctive triangle (spaceship pointing toward center)
+        import math
+
+        # Calculate angle pointing toward center
+        center_x = self.width // 2
+        center_y = self.height // 2 - 50
+        dx = (center_x - int(self.scroll_x)) - sx
+        dy = (center_y - int(self.scroll_y)) - sy
+        angle_to_center = math.atan2(dy, dx)
+
+        # Ship size
+        ship_size = int(20 * self.zoom)
+
+        # Triangle points (pointing in direction of angle)
+        points = []
+        for i in range(3):
+            point_angle = angle_to_center + (i - 1) * 2.0944  # 120 degrees apart
+            px = sx + ship_size * math.cos(point_angle)
+            py = sy + ship_size * math.sin(point_angle)
+            points.append((px, py))
+
+        # Draw glow effect
+        import time
+        pulse = abs((time.time() * 3) % 2 - 1)
+        glow_size = int(ship_size * 1.5 + pulse * 8)
+
+        for i in range(3, 0, -1):
+            glow_alpha = int(50 * (i / 3))
+            glow_surf = pygame.Surface((glow_size * 2, glow_size * 2), pygame.SRCALPHA)
+            glow_color = (100, 200, 255, glow_alpha)
+            pygame.draw.circle(glow_surf, glow_color, (glow_size, glow_size), glow_size - i * 3)
+            self.surface.blit(glow_surf, (sx - glow_size, sy - glow_size))
+
+        # Draw ship triangle
+        pygame.draw.polygon(self.surface, (150, 220, 255), points)
+        pygame.draw.polygon(self.surface, (255, 255, 255), points, 2)
+
+        # Add ship label
+        label_font = pygame.font.SysFont('sans-serif', 12, bold=True)
+        label = label_font.render("YOUR SHIP", True, (150, 220, 255))
+        label_rect = label.get_rect(center=(sx, sy - ship_size - 15))
+
+        # Label background
+        bg_rect = label_rect.inflate(8, 4)
+        bg_surf = pygame.Surface(bg_rect.size, pygame.SRCALPHA)
+        pygame.draw.rect(bg_surf, (20, 20, 40, 180), bg_surf.get_rect())
+        self.surface.blit(bg_surf, bg_rect)
+
+        # Label text
+        self.surface.blit(label, label_rect)
 
     def _render_info_panel(self):
         """Render info panel showing current status and controls"""

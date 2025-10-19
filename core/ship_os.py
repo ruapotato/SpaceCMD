@@ -363,6 +363,36 @@ SYSTEMS:
         self.vfs.device_handlers['dev_ship_fire'] = (fire_read, fire_write)
         self.vfs.create_device('/dev/ship/fire', True, 0, 0, device_name='dev_ship_fire')
 
+        # /dev/ship/move - move closer/away during combat (write "closer" or "away")
+        def move_read(size):
+            return b"Write 'closer' to advance or 'away' to retreat\n"
+
+        def move_write(data):
+            """Write movement command during combat"""
+            if not self.world_manager or not self.world_manager.is_in_combat():
+                return -1
+
+            try:
+                direction = data.decode('utf-8').strip().lower()
+                combat = self.world_manager.combat_state
+
+                if direction == "closer" or direction == "advance":
+                    if combat.move_closer():
+                        return len(data)
+                    return 0  # At minimum distance
+
+                elif direction == "away" or direction == "retreat":
+                    if combat.move_away():
+                        return len(data)
+                    return 0  # At maximum distance
+
+                return -1  # Invalid command
+            except:
+                return -1
+
+        self.vfs.device_handlers['dev_ship_move'] = (move_read, move_write)
+        self.vfs.create_device('/dev/ship/move', True, 0, 0, device_name='dev_ship_move')
+
         # /dev/ship/crew_assign - assign crew to rooms (write "crew_name room_name")
         def crew_assign_read(size):
             return b"Write 'crew_name room_name' to assign crew to a room\n"
@@ -428,6 +458,54 @@ Visited: {'Yes' if node.visited else 'No'}
 
         self.vfs.device_handlers['proc_ship_location'] = (location_read, lambda data: 0)
         self.vfs.create_device('/proc/ship/location', True, 0, 0, device_name='proc_ship_location')
+
+        # /proc/ship/sensors - sensor data (requires sensors to be functional)
+        def sensors_read(size):
+            # Check if sensors system is functional
+            sensors_online = False
+            if SystemType.SENSORS in self.ship.systems:
+                sensors_system = self.ship.systems[SystemType.SENSORS]
+                sensors_online = sensors_system.is_online()
+
+            if not sensors_online:
+                return b"SENSORS OFFLINE - No sensor data available\n"
+
+            # Sensors are online - provide detailed galaxy position
+            info = f"""=== SENSOR READOUT ===
+Galaxy Position: {self.ship.galaxy_distance_from_center:.1f} units from galactic center
+Ship Speed: {self.ship.speed:.2f} units/sec (max: {self.ship.max_speed:.2f})
+
+"""
+            # Add current node info if world_manager available
+            if self.world_manager:
+                node = self.world_manager.world_map.get_current_node()
+                if node:
+                    info += f"""Current Node: {node.id}
+Node Type: {node.type.value}
+Sector: {node.sector + 1}/{self.world_manager.world_map.num_sectors}
+Difficulty: {node.difficulty}
+Distance from Center: {node.distance_from_center:.1f}
+"""
+            # Add combat distance info if in combat
+            if self.world_manager and self.world_manager.is_in_combat():
+                info += "\n=== COMBAT SENSORS ===\n"
+                combat = self.world_manager.combat_state
+                if combat and hasattr(combat, 'combat_distance'):
+                    info += f"Enemy Distance: {combat.combat_distance:.1f} units\n"
+                    info += f"Range Limits: {combat.min_distance:.1f} - {combat.max_distance:.1f} units\n"
+                    # Show weapon ranges
+                    if self.ship.weapons:
+                        info += "\nWeapon Ranges:\n"
+                        for i, weapon in enumerate(self.ship.weapons):
+                            in_range = "✓" if combat.combat_distance <= weapon.range else "✗"
+                            info += f"  {in_range} {weapon.name}: {weapon.range:.1f} units\n"
+                else:
+                    info += "Enemy Distance: Close range\n"
+
+            return info.encode('utf-8')
+
+        self.vfs.device_handlers['proc_ship_sensors'] = (sensors_read, lambda data: 0)
+        self.vfs.create_device('/proc/ship/sensors', True, 0, 0, device_name='proc_ship_sensors')
 
         # /proc/ship/jumps - available jump destinations
         def jumps_read(size):

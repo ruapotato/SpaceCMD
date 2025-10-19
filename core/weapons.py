@@ -37,6 +37,7 @@ class Weapon:
         self.shots = 1  # Burst lasers fire multiple shots
         self.pierce = 0  # Shields pierced
         self.requires_missiles = False
+        self.range = 5.0  # Maximum firing range (units)
 
         self._setup_weapon_stats()
 
@@ -47,18 +48,21 @@ class Weapon:
             self.cooldown_time = 10.0
             self.damage = 1
             self.shots = 1
+            self.range = 4.0  # Medium range
 
         elif self.weapon_type == WeaponType.BURST_LASER:
             self.power_required = 2
             self.cooldown_time = 12.0
             self.damage = 1
             self.shots = 3  # Fires 3 shots!
+            self.range = 4.0  # Medium range
 
         elif self.weapon_type == WeaponType.HEAVY_LASER:
             self.power_required = 1
             self.cooldown_time = 9.0
             self.damage = 2
             self.shots = 1
+            self.range = 3.5  # Shorter range for heavy laser
 
         elif self.weapon_type == WeaponType.MISSILE:
             self.power_required = 1
@@ -67,6 +71,7 @@ class Weapon:
             self.shots = 1
             self.pierce = 999  # Missiles bypass shields
             self.requires_missiles = True
+            self.range = 8.0  # Long range!
 
         elif self.weapon_type == WeaponType.ION:
             self.power_required = 1
@@ -74,6 +79,7 @@ class Weapon:
             self.damage = 0
             self.shots = 1
             self.ion_damage = 1  # Removes 1 shield layer
+            self.range = 4.5  # Medium-long range
 
         elif self.weapon_type == WeaponType.BEAM:
             self.power_required = 2
@@ -81,6 +87,7 @@ class Weapon:
             self.damage = 2
             self.shots = 1
             self.beam_length = 3  # Hits multiple rooms
+            self.range = 2.0  # Short range!
 
         elif self.weapon_type == WeaponType.BOMB:
             self.power_required = 1
@@ -89,6 +96,7 @@ class Weapon:
             self.shots = 1
             self.pierce = 999  # Bombs teleport through shields
             self.requires_missiles = True
+            self.range = 1.5  # Very short range (teleporter range)
 
     def update(self, dt: float, powered: bool):
         """Update weapon charging"""

@@ -211,6 +211,11 @@ class Ship:
         self.shields_max = 0
         self.evasion = 0
 
+        # Galaxy position and movement
+        self.galaxy_distance_from_center = 400.0  # Distance from galaxy center
+        self.speed = 1.0  # Ship speed (affects chase mechanics)
+        self.max_speed = 2.0  # Maximum speed
+
         # Ship template (ASCII art)
         self.template = None
 

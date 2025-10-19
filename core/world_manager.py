@@ -41,6 +41,11 @@ class WorldManager:
         # World Map
         self.world_map = WorldMap(num_sectors=num_sectors, nodes_per_sector=8)
 
+        # Initialize ship position to starting node
+        starting_node = self.world_map.get_current_node()
+        if starting_node:
+            self.ship.galaxy_distance_from_center = starting_node.distance_from_center
+
         # Combat state
         self.combat_state = None
         self.enemy_ship = None
@@ -208,6 +213,11 @@ class WorldManager:
         fuel_cost = 1
         if self.ship.dark_matter >= fuel_cost:
             self.ship.dark_matter -= fuel_cost
+
+        # Update ship's galaxy position (distance from center)
+        current_node = self.world_map.get_current_node()
+        if current_node:
+            self.ship.galaxy_distance_from_center = current_node.distance_from_center
 
         # Handle arrival at new node
         self._handle_node_arrival()

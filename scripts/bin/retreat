@@ -1,0 +1,43 @@
+#!/usr/bin/pooscript
+# retreat - Move away from enemy during combat
+
+# Check if in combat
+try:
+    fd = kernel.open("/proc/ship/combat", kernel.O_RDONLY)
+    combat_state = kernel.read(fd, 4096).decode('utf-8')
+    kernel.close(fd)
+
+    if "No active combat" in combat_state:
+        error("No combat active. Cannot retreat.")
+        exit(1)
+except Exception as e:
+    error(f"Failed to check combat status: {e}")
+    exit(1)
+
+# Write to movement device
+try:
+    fd = kernel.open("/dev/ship/move", kernel.O_WRONLY)
+    bytes_written = kernel.write(fd, b"away")
+    kernel.close(fd)
+
+    if bytes_written > 0:
+        print("✓ Retreated from enemy")
+
+        # Show new distance
+        try:
+            sensor_fd = kernel.open("/proc/ship/sensors", kernel.O_RDONLY)
+            sensor_data = kernel.read(sensor_fd, 4096).decode('utf-8')
+            kernel.close(sensor_fd)
+
+            for line in sensor_data.split('\n'):
+                if "Enemy Distance:" in line:
+                    print(line)
+                    break
+        except:
+            pass  # Ignore sensor read errors
+    else:
+        error("Cannot retreat further (at maximum range)")
+        exit(1)
+except Exception as e:
+    error(f"Movement failed: {e}")
+    exit(1)

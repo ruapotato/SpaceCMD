@@ -33,6 +33,8 @@ class SystemMonitor:
         self.shields_max = 4
         self.power_used = 0
         self.power_total = 0
+        self.location = "Unknown"
+        self.location_available = False
         self.update_interval = 0.5  # Update every 0.5 seconds
         self.time_since_update = 0
 
@@ -70,6 +72,25 @@ class SystemMonitor:
                         self.power_total = int(line.split(':')[1].strip())
                     elif 'Allocated:' in line:
                         self.power_used = int(line.split(':')[1].strip())
+
+            # Read location from /proc/ship/sensors (requires sensors to be functional)
+            exit_code, stdout, stderr = self.ship_os.execute_command("cat /proc/ship/sensors")
+            if exit_code == 0 and stdout:
+                if "SENSORS OFFLINE" not in stdout:
+                    # Sensors are online, extract location
+                    self.location_available = True
+                    for line in stdout.split('\n'):
+                        if 'Galaxy Position:' in line:
+                            # Extract distance value
+                            parts = line.split(':')
+                            if len(parts) > 1:
+                                distance_str = parts[1].strip().split()[0]
+                                self.location = f"{float(distance_str):.0f}u"
+                            break
+                else:
+                    # Sensors offline
+                    self.location_available = False
+                    self.location = "OFFLINE"
 
             # Get max values from ship object if available
             if hasattr(self.ship_os, 'ship'):
@@ -132,6 +153,18 @@ class SystemMonitor:
         # Power bar
         power_pct = self.power_used / self.power_total if self.power_total > 0 else 0
         self._draw_bar(surface, current_x, y + 10, bar_width, bar_height, power_pct, power_color)
+        current_x += bar_width + 16
+
+        # Location monitor (requires sensors)
+        if self.location_available:
+            location_text = f"LOCATION: {self.location}"
+            location_color = (153, 255, 153)  # Green
+        else:
+            location_text = f"SENSORS: {self.location}"
+            location_color = (128, 128, 128)  # Gray
+
+        location_surface = Theme.FONT_UI.render(location_text, True, location_color)
+        surface.blit(location_surface, (current_x, y + 8))
 
     def _get_health_color(self, current, maximum):
         """Get color based on health percentage"""
@@ -216,8 +249,8 @@ class TopBar:
 
         # System monitor on right
         if self.system_monitor:
-            monitor_x = self.screen_width - 600  # Give it 600px on the right
-            self.system_monitor.render(surface, monitor_x, 0, 600)
+            monitor_x = self.screen_width - 700  # Give it 700px on the right
+            self.system_monitor.render(surface, monitor_x, 0, 700)
 
     def handle_event(self, event, mouse_pos):
         """

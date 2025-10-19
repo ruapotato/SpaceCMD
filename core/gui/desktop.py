@@ -291,6 +291,13 @@ class Desktop:
         from .map_widget_v2 import MapWidgetV2
 
         map_widget = MapWidgetV2(800, 600)
+
+        # Set references if available
+        if self.ship_os:
+            map_widget.ship_os = self.ship_os
+            if hasattr(self.ship_os, 'world_manager') and self.ship_os.world_manager:
+                map_widget.set_world_manager(self.ship_os.world_manager)
+
         window = Window(title, x, y, 800, 600, map_widget)
         self.add_window(window)
         return window
