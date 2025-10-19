@@ -188,7 +188,7 @@ class Desktop:
 
         # Menu state
         self.menu_open = False
-        self.menu_rect = pygame.Rect(4, height - Theme.TASKBAR_HEIGHT - 200, 150, 200)
+        self.menu_rect = pygame.Rect(4, height - Theme.TASKBAR_HEIGHT - 280, 180, 280)
 
         # ShipOS reference (will be set by play.py)
         self.ship_os = None
@@ -271,6 +271,61 @@ class Desktop:
         self.add_window(window)
         return window
 
+    def create_file_browser_window(self, title="Files", x=150, y=100):
+        """
+        Create a file browser window.
+
+        Returns:
+            Window: The created window
+        """
+        from .file_browser import FileBrowserWidget
+        from .text_editor import TextEditorWidget
+
+        if not self.ship_os:
+            return None
+
+        browser = FileBrowserWidget(500, 400, self.ship_os)
+        window = Window(title, x, y, 500, 400, browser)
+
+        # Set callback to open files in text editor
+        def open_file(file_path):
+            self.create_text_editor_window(file_path)
+
+        browser.set_file_open_callback(open_file)
+
+        self.add_window(window)
+        return window
+
+    def create_text_editor_window(self, file_path=None, title=None, x=200, y=150):
+        """
+        Create a text editor window.
+
+        Args:
+            file_path: Optional file path to open
+            title: Optional window title (defaults to filename)
+            x: X position
+            y: Y position
+
+        Returns:
+            Window: The created window
+        """
+        from .text_editor import TextEditorWidget
+
+        if not self.ship_os:
+            return None
+
+        # Determine title
+        if title is None:
+            if file_path:
+                title = f"Edit: {file_path}"
+            else:
+                title = "Text Editor"
+
+        editor = TextEditorWidget(700, 500, self.ship_os, file_path)
+        window = Window(title, x, y, 700, 500, editor)
+        self.add_window(window)
+        return window
+
     def handle_events(self):
         """Handle all input events"""
         for event in pygame.event.get():
@@ -320,9 +375,13 @@ class Desktop:
 
                     if item_index == 0:  # New Terminal
                         self.create_terminal_window()
-                    elif item_index == 1:  # Tactical Display
+                    elif item_index == 1:  # File Browser
+                        self.create_file_browser_window()
+                    elif item_index == 2:  # Text Editor
+                        self.create_text_editor_window()
+                    elif item_index == 3:  # Tactical Display
                         self.create_tactical_window()
-                    elif item_index == 2:  # Quit
+                    elif item_index == 5:  # Quit (after separator)
                         self.running = False
 
                     self.menu_open = False
@@ -414,6 +473,8 @@ class Desktop:
         # Menu items
         menu_items = [
             "New Terminal",
+            "File Browser",
+            "Text Editor",
             "Tactical Display",
             "---",
             "Quit"

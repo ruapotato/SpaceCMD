@@ -42,6 +42,9 @@ class ShipOS(UnixSystem):
         # Customize MOTD for ship
         self._create_ship_motd()
 
+        # Add helpful README in /root/
+        self._create_root_readme()
+
     def _create_ship_motd(self):
         """Create ship-specific MOTD"""
         motd = f"""
@@ -82,6 +85,31 @@ class ShipOS(UnixSystem):
 ═══════════════════════════════════════════════════════════════
 """.encode('utf-8')
         self.vfs.write_file('/etc/motd', motd, 1)
+
+    def _create_root_readme(self):
+        """Create helpful README.md in /root/ directory"""
+        import os
+        readme_path = os.path.join(os.path.dirname(__file__), 'resources', 'root_readme.md')
+
+        try:
+            with open(readme_path, 'r') as f:
+                readme_content = f.read()
+            self.vfs.write_file('/root/README.md', readme_content.encode('utf-8'), 1)
+        except FileNotFoundError:
+            # Fallback if resources file doesn't exist
+            fallback_readme = """# Welcome to ShipOS!
+
+Type 'help' to see available commands.
+Type 'cat /etc/motd' to see the welcome message.
+
+Try exploring:
+- ls /dev/ship
+- cat /proc/ship/status
+- power
+
+Good luck, Captain!
+""".encode('utf-8')
+            self.vfs.write_file('/root/README.md', fallback_readme, 1)
 
     def _mount_ship_systems(self):
         """Mount all ship systems as device files in /dev, /proc, /sys"""
