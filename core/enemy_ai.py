@@ -151,6 +151,7 @@ elif current_shields < 4:
 # Automatic Damage Control
 # Priority: HIGH
 # Repairs critical systems and manages hull breaches
+# SMART: Sends bots to specific damaged rooms!
 
 # Check hull integrity
 hull_str = vfs.read("/proc/ship/hull")
@@ -160,31 +161,52 @@ hull_max = int(hull_max_str.strip())
 
 hull_percent = (hull * 100) // hull_max
 
-# Emergency repairs
+# Check each system and send bot to most damaged
+systems = ["weapons", "shields", "engines", "oxygen"]
+most_damaged_system = None
+lowest_health = 100.0
+
+for system in systems:
+    try:
+        sys_data = vfs.read(f"/proc/systems/{system}")
+
+        # Parse health from system data
+        for line in sys_data.split("\\n"):
+            if "offline" in line.lower():
+                # Critical! This system is offline
+                most_damaged_system = system
+                lowest_health = 0.0
+                break
+            # Look for health percentage or damage indicators
+            if "damage" in line.lower() or "health" in line.lower():
+                # System is damaged, prioritize it
+                if most_damaged_system is None:
+                    most_damaged_system = system
+                    lowest_health = 50.0  # Assume moderate damage
+
+    except:
+        pass  # System might not exist
+
+# Send repair bot to most damaged system
+if most_damaged_system:
+    print(f"PRIORITY REPAIR: {most_damaged_system}")
+    print(f"MOVE_CREW: bot2 {most_damaged_system}")
+    print(f"REPAIR: {most_damaged_system}")
+
+# Emergency hull repairs if critical
 if hull_percent < 30:
     print("EMERGENCY: Critical hull damage!")
-    print("REPAIR: hull")
-
-    # All crew to repair stations
-    print("MOVE_CREW: all repair")
+    # All crew to repair stations if hull critical
+    print("MOVE_CREW: bot3 hull_repair")
 elif hull_percent < 60:
     print("WARNING: Hull damage detected")
-    # Send one bot to repair
-    print("MOVE_CREW: bot2 repair")
 
-# Check oxygen levels
+# Check oxygen levels (always critical)
 oxygen_data = vfs.read("/proc/systems/oxygen")
 if "offline" in oxygen_data or "level: 0" in oxygen_data:
     print("EMERGENCY: Oxygen failure!")
     print("REPAIR: oxygen")
-    print("MOVE_CREW: bot2 oxygen")
-
-# Check for system failures
-systems = ["weapons", "shields", "engines", "oxygen"]
-for system in systems:
-    sys_data = vfs.read(f"/proc/systems/{system}")
-    if "offline" in sys_data:
-        print(f"REPAIR: {system}")
+    print("MOVE_CREW: bot1 oxygen")
 """
 
         # Tactical AI

@@ -1,0 +1,40 @@
+#!/usr/bin/pooscript
+# warp_from_center - Set course away from galactic center
+
+# Read current location
+try:
+    fd = kernel.open("/proc/ship/location", kernel.O_RDONLY)
+    location_data = kernel.read(fd, 4096).decode('utf-8')
+    kernel.close(fd)
+except Exception as e:
+    error(f"Failed to read location: {e}")
+    exit(1)
+
+# Extract current position and max distance
+current_pos = 0.0
+max_dist = 1000.0
+for line in location_data.split('\n'):
+    if "Position:" in line and "units from center" in line:
+        try:
+            current_pos = float(line.split(':')[1].strip().split()[0])
+        except:
+            pass
+    elif "Max Galaxy Distance:" in line:
+        try:
+            max_dist = float(line.split(':')[1].strip())
+        except:
+            pass
+
+# Set course to outer rim (max distance)
+try:
+    fd = kernel.open("/dev/ship/course", kernel.O_WRONLY)
+    kernel.write(fd, str(max_dist).encode())
+    kernel.close(fd)
+
+    print(f"✓ Course set away from galactic center")
+    print(f"  Current position: {current_pos:.1f}")
+    print(f"  Destination: {max_dist:.1f} (outer rim)")
+    print(f"  Distance: {abs(max_dist - current_pos):.1f} units")
+except Exception as e:
+    error(f"Failed to set course: {e}")
+    exit(1)

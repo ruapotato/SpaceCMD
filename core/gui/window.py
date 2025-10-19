@@ -199,18 +199,34 @@ class Window:
                 self._create_surface()
                 self._update_content_rect()
                 self._update_button_positions()
+                # Resize content widget if it has set_size
+                if self.content_widget and hasattr(self.content_widget, 'set_size'):
+                    self.content_widget.set_size(
+                        self.rect.width - Theme.WINDOW_BORDER_WIDTH * 2,
+                        self.rect.height - Theme.WINDOW_TITLEBAR_HEIGHT - Theme.WINDOW_BORDER_WIDTH
+                    )
         else:
             # Maximize (will be handled by Desktop to get screen size)
             self.state = WindowState.MAXIMIZED
 
-    def maximize(self, screen_width, screen_height, taskbar_height):
-        """Maximize window to fill screen (minus taskbar)"""
-        self.saved_rect = self.rect.copy()
-        self.rect = pygame.Rect(0, 0, screen_width, screen_height - taskbar_height)
+    def maximize(self, screen_width, screen_height, taskbar_height, topbar_height=0):
+        """Maximize window to fill screen (minus taskbar and topbar)"""
+        if self.state != WindowState.MAXIMIZED:
+            self.saved_rect = self.rect.copy()
+
+        available_height = screen_height - taskbar_height - topbar_height
+        self.rect = pygame.Rect(0, topbar_height, screen_width, available_height)
         self.state = WindowState.MAXIMIZED
         self._create_surface()
         self._update_content_rect()
         self._update_button_positions()
+
+        # Resize content widget to match new size
+        if self.content_widget and hasattr(self.content_widget, 'set_size'):
+            self.content_widget.set_size(
+                self.rect.width - Theme.WINDOW_BORDER_WIDTH * 2,
+                self.rect.height - Theme.WINDOW_TITLEBAR_HEIGHT - Theme.WINDOW_BORDER_WIDTH
+            )
 
     def _update_button_positions(self):
         """Update button positions after resize"""

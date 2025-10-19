@@ -1,0 +1,73 @@
+#!/usr/bin/pooscript
+# Enemy Ship AI
+# This script runs on enemy ships to control their behavior
+# It reads ship state from /proc and /dev, makes decisions, and takes actions
+
+# Main AI loop - runs continuously during combat
+def enemy_ai_turn():
+    # Read our ship status
+    my_status = vfs.read('/proc/ship/status')
+
+    # Read enemy (player) ship info
+    enemy_info = vfs.read('/proc/ship/enemy')
+
+    # Read combat state
+    combat_info = vfs.read('/proc/ship/combat')
+
+    # Read sensor data to get positions/distances
+    sensors = vfs.read('/proc/ship/sensors')
+
+    # Parse our hull
+    my_hull = 30  # default
+    for line in my_status.split('\n'):
+        if 'Hull:' in line:
+            parts = line.split(':')[1].strip().split('/')
+            my_hull = int(parts[0])
+
+    # Parse enemy hull
+    enemy_hull = 30  # default
+    for line in enemy_info.split('\n'):
+        if 'Hull:' in line:
+            parts = line.split(':')[1].strip().split('/')
+            enemy_hull = int(parts[0])
+
+    # Decision: Should we pursue if they flee?
+    # Pursue if we're winning (they have less hull than us)
+    should_pursue = enemy_hull < my_hull
+
+    # Store pursuit decision (this would be read by Python combat system)
+    if should_pursue:
+        vfs.write('/tmp/ai_pursue', '1')
+    else:
+        vfs.write('/tmp/ai_pursue', '0')
+
+    # Choose target system
+    # Priority: Weapons > Shields > Engines > random
+    target = None
+    if 'weapons' in enemy_info.lower():
+        target = 'Weapons'
+    elif 'shields' in enemy_info.lower():
+        target = 'Shields'
+    elif 'engines' in enemy_info.lower():
+        target = 'Engines'
+
+    if target:
+        vfs.write('/dev/ship/target', target)
+
+    # Fire ready weapons
+    weapons = vfs.read('/proc/ship/weapons')
+    weapon_num = 0
+    for line in weapons.split('\n'):
+        if 'READY' in line:
+            # Fire this weapon
+            vfs.write('/dev/ship/fire', str(weapon_num))
+        weapon_num += 1
+
+    # Movement decisions
+    # Try to get in weapon range
+    # (This would read combat distance and adjust)
+
+    return 0
+
+# Run the AI
+enemy_ai_turn()

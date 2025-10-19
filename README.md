@@ -346,6 +346,136 @@ for system in systems:
 
 ## 🎯 Architecture & Design Principles
 
+### THREE-LAYER ARCHITECTURE
+
+SpaceCMD uses a strict three-layer architecture that enables all three game modes:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  LAYER 3: USER INTERFACE                                    │
+│  ┌──────────────┬──────────────┬────────────────────────┐   │
+│  │  GUI Mode    │ Terminal Mode │  Scripting Mode        │   │
+│  │  (Pygame)    │  (CLI/LCARS) │  (PooScript Automation)│   │
+│  └──────────────┴──────────────┴────────────────────────┘   │
+│         All three modes work because they all read          │
+│         the same VFS device files and run PooScript         │
+├─────────────────────────────────────────────────────────────┤
+│  LAYER 2: VFS / DEVICE FILES                                │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │  /proc/ship/*  - Ship state (read-only)            │    │
+│  │  /dev/ship/*   - Ship hardware (read/write)        │    │
+│  │  /sys/ship/*   - System attributes (read/write)    │    │
+│  │  scripts/bin/* - PooScript shell commands          │    │
+│  └─────────────────────────────────────────────────────┘    │
+│         VFS exposes Python state to PooScript               │
+│         PooScript commands read/write device files          │
+├─────────────────────────────────────────────────────────────┤
+│  LAYER 1: PYTHON CORE (Game Logic)                          │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │  Ship.py       - Ship physics & movement           │    │
+│  │  Combat.py     - Combat physics & damage           │    │
+│  │  LinearGalaxy  - 1D galaxy with positions          │    │
+│  │  WorldManager  - Enemy spawning & encounters       │    │
+│  │  ShipOS        - OS for each ship (player+enemies) │    │
+│  └─────────────────────────────────────────────────────┘    │
+│         Python handles physics, updates VFS state           │
+│         NEVER implements game behavior directly             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### CRITICAL: What Goes Where?
+
+#### ✅ PYTHON LAYER (core/*.py)
+**Purpose:** Physics, state management, infrastructure
+**Examples:**
+- Ship position/velocity calculations
+- Damage calculations (shields absorb X, hull takes Y-X)
+- Engine effectiveness = health × power × (1 + crew_bonus)
+- Update VFS device file contents every frame
+- Spawn enemies at positions
+- Calculate weapon hit/miss
+
+**Rules:**
+- NO game behavior decisions (no "if hull < 10 then flee")
+- NO AI logic (no "target their weapons first")
+- ONLY physics and math
+- Updates state, exposes via VFS
+
+#### ✅ VFS LAYER (ShipOS device files)
+**Purpose:** Expose Python state to PooScript, accept commands
+**Examples:**
+- `/proc/ship/sensors` - Read ship position from Python
+- `/dev/ship/move` - Write movement commands to Python
+- `/dev/ship/target` - Set weapon target
+- `/dev/ship/fire` - Trigger weapon
+
+**Rules:**
+- Read handlers: Get data from Python objects
+- Write handlers: Call Python methods with data
+- Device files are the ONLY interface between Python and PooScript
+
+#### ✅ POOSCRIPT LAYER (scripts/bin/*, enemy AI)
+**Purpose:** ALL game behavior, decisions, automation
+**Examples:**
+- `scripts/bin/advance` - Command to move toward center
+- `scripts/bin/retreat` - Command to flee combat
+- `scripts/bin/fire` - Smart weapon firing logic
+- `core/resources/enemy_ai.poo` - Enemy decision making
+
+**Rules:**
+- ALL decisions happen here ("should I flee?", "which weapon?")
+- Reads `/proc/ship/*` to get state
+- Writes `/dev/ship/*` to take actions
+- Enemy AI is PooScript running on enemy ShipOS
+
+### Why This Architecture?
+
+1. **Three Game Modes**: GUI, Terminal, Scripting all work because they use same VFS
+2. **Hackable Enemies**: Enemy AI is real PooScript you can read/steal/modify
+3. **Scriptable Everything**: Players write PooScript to automate
+4. **Future Hacking**: Can implement ship-to-ship hacking (access enemy VFS)
+
+### Examples
+
+❌ **WRONG** (Python implementing behavior):
+```python
+# combat.py - DON'T DO THIS!
+def enemy_ai_turn(self):
+    if self.enemy_ship.hull < 10:
+        self.attempt_flee()  # ❌ Decision in Python!
+```
+
+✅ **RIGHT** (PooScript implementing behavior):
+```python
+# core/resources/enemy_ai.poo
+#!/usr/bin/pooscript
+# Read our hull
+my_hull = int(vfs.read('/dev/ship/hull').strip())
+
+# Decide to flee (decision in PooScript!)
+if my_hull < 10:
+    vfs.write('/tmp/ai_should_flee', '1')
+```
+
+❌ **WRONG** (Python hardcoding command):
+```python
+# ship_os.py - DON'T DO THIS!
+def advance_command(self):
+    self.ship.set_course(self.ship.position - 10)  # ❌ Hardcoded!
+```
+
+✅ **RIGHT** (PooScript shell command):
+```bash
+# scripts/bin/advance
+#!/usr/bin/pooscript
+# Read current position
+pos = float(vfs.read('/proc/ship/sensors').split('Position:')[1].split()[0])
+
+# Move toward center (position - 10)
+target = pos - 10
+vfs.write('/dev/ship/course', str(target))
+```
+
 ### Core Design Principle: AVOID HARD-CODED PYTHON
 
 **SpaceCMD is script-driven, NOT Python-driven.**
@@ -361,43 +491,490 @@ for system in systems:
 
 **Everything must be hackable. If it's hard-coded in Python, players can't hack it!**
 
-### Architecture
-
-```
-┌─────────────────────────────────────┐
-│     Game UI (LCARS 3-Panel)         │  Shows ship interiors
-├─────────────────────────────────────┤
-│   PoohScript Interpreter            │  Executes ALL game logic
-├─────────────────────────────────────┤
-│     Multiple ShipOS Instances       │  Player + Enemy ships
-│  ┌──────────┬──────────┬──────────┐ │
-│  │ /proc/   │ /usr/bin/│  VFS +   │ │  Each ship = Unix system
-│  │ Status   │ AI Scripts│ Kernel  │ │
-│  └──────────┴──────────┴──────────┘ │
-├─────────────────────────────────────┤
-│   Ship Physics (Minimal Python)     │  Only physics, no AI
-└─────────────────────────────────────┘
-```
-
 ### What's Implemented in PoohScript vs Python
 
 **PoohScript (Hackable):**
 - Enemy weapon control AI
 - Enemy shield management
 - Enemy damage control
-- Enemy tactical decisions
+- Enemy tactical decisions (flee/fight)
 - Player automation scripts
-- All commands (`status`, `fire`, `power`, etc.)
-- Crew bot behavior (future)
+- All commands (`status`, `fire`, `advance`, `retreat`)
+- Shell commands in `scripts/bin/*`
 
 **Python (Infrastructure Only):**
 - PoohScript interpreter
 - VFS/filesystem implementation
 - Terminal UI rendering
-- Physics calculations (damage, power)
-- Network between ship OSes
+- Physics calculations (damage, movement, power)
+- ShipOS instances (one per ship)
+- Device file read/write handlers
+
+**VFS Layer (Bridge):**
+- `/proc/ship/*` - Expose Python state to PooScript
+- `/dev/ship/*` - Accept PooScript commands to Python
+- Device handlers update Python objects
 
 **The rule:** If a player should be able to hack it, it MUST be PoohScript.
+
+---
+
+## 📐 Complete Architecture Guide
+
+### Directory Structure
+
+```
+SpaceCMD/
+├── core/                      # Python infrastructure layer
+│   ├── ship.py               # Ship physics, movement, power systems
+│   ├── combat.py             # Combat physics, damage calculations
+│   ├── linear_galaxy.py      # 1D galaxy with positions, POIs
+│   ├── world_manager.py      # Enemy spawning, encounters
+│   ├── ship_os.py            # ShipOS - mounts VFS device files
+│   ├── system.py             # Unix system (VFS, processes, shell)
+│   ├── pooscript.py          # PoohScript interpreter
+│   ├── enemy_ai.py           # Enemy filesystem with AI scripts
+│   ├── terminal_ui.py        # LCARS terminal interface
+│   └── gui/                  # Pygame GUI components
+│       ├── desktop.py        # Window manager
+│       ├── terminal_widget.py # Terminal window
+│       ├── tactical_widget.py # Ship interior display
+│       └── map_widget_v2.py  # Galaxy map with navigation
+│
+├── scripts/                   # PoohScript command layer
+│   └── bin/                  # Shell commands (Layer 2)
+│       ├── status            # Show ship status
+│       ├── fire              # Fire weapons
+│       ├── power             # Manage power allocation
+│       ├── advance           # Move toward galaxy center
+│       ├── retreat           # Move away from enemy
+│       ├── warp_to_center    # Navigate to galactic center
+│       ├── warp_from_center  # Navigate to outer rim
+│       ├── stop              # Emergency stop
+│       └── ...               # 25+ other commands
+│
+├── play.py                    # Main entry point
+└── README.md                  # This file
+```
+
+### Layer 1: Python Core (Physics Engine)
+
+**File: `core/ship.py`**
+- Ship movement physics (velocity, position, target_position)
+- Power system (reactor output, power allocation)
+- Crew AI priorities (fire > repair > heal > operate)
+- System effectiveness = health × power × (1 + crew_bonus)
+- Repair rates (now 1/10th slower for balance)
+- Updates ship state every frame (position, hull, shields)
+
+**File: `core/combat.py`**
+- Combat distance tracking (0.5 to 10.0 units)
+- Sensor range and enemy fade mechanics (30 unit range)
+- Chase mechanics (player fleeing, enemy pursuing)
+- Damage calculations (shields absorb, then hull/system damage)
+- Weapon range checks
+- Victory/defeat conditions
+
+**File: `core/linear_galaxy.py`**
+- 1D galaxy (position from center: 0 = center, 1000 = outer rim)
+- Points of Interest (POIs): stores, repair stations, nebulas
+- Difficulty scaling based on distance from center
+- Enemy type selection by position
+
+**File: `core/world_manager.py`**
+- Spawns enemies at player position during combat
+- Manages active encounters
+- Handles combat state transitions
+- Tracks visited POIs
+- Controls enemy pursuit/fade based on distance
+
+**Key Principle:** Python NEVER makes gameplay decisions. It only:
+- Calculates physics (damage = shields_absorb(weapon.damage))
+- Updates state (ship.position += velocity * dt)
+- Checks validity (is weapon in range? does system have power?)
+
+### Layer 2: VFS Device Files (The Bridge)
+
+**File: `core/ship_os.py`** - Creates all device files
+
+#### Read-Only Status Files (`/proc/ship/*`)
+
+```python
+/proc/ship/status       # Complete ship overview
+/proc/ship/power        # Power allocation details
+/proc/ship/crew_ai      # What autonomous bots are doing
+/proc/ship/combat       # Current combat status
+/proc/ship/weapons      # All weapons and charge status
+/proc/ship/enemy        # Enemy ship systems (when in combat)
+/proc/ship/location     # Galaxy position and difficulty
+/proc/ship/sensors      # Sensor readout (position, velocity, nearby POIs)
+/proc/ship_info         # Detailed ship statistics
+```
+
+#### Hardware Device Files (`/dev/ship/*`)
+
+```python
+/dev/ship/hull          # Read current hull points
+/dev/ship/shields       # Read current shield layers
+/dev/ship/reactor       # Read reactor power output
+/dev/ship/dark_matter   # Read FTL fuel
+
+# Write-capable devices
+/dev/ship/target        # Write room name to target enemy system
+/dev/ship/fire          # Write weapon index to fire
+/dev/ship/move          # Write "closer" or "away" for combat movement
+/dev/ship/course        # Write destination position for galaxy travel
+/dev/ship/stop          # Write anything to emergency stop
+/dev/ship/beacon        # Write 1 to activate distress beacon (attracts enemies!)
+/dev/ship/crew_assign   # Write "crew_name room_name" to move crew
+```
+
+#### System Attributes (`/sys/ship/systems/*`)
+
+Each system has:
+```python
+/sys/ship/systems/weapons/status   # "ONLINE" or "OFFLINE"
+/sys/ship/systems/weapons/power    # Current power (read/write)
+/sys/ship/systems/weapons/health   # Health percentage (read-only)
+/sys/ship/systems/shields/...      # Same attributes
+/sys/ship/systems/engines/...
+/sys/ship/systems/oxygen/...
+```
+
+#### Device File Handlers
+
+Device files are implemented as Python functions in `ship_os.py`:
+
+```python
+def course_write(data):
+    """Handle writing to /dev/ship/course"""
+    destination = float(data.decode('utf-8').strip())
+    destination = max(0.0, min(world_manager.galaxy.max_distance, destination))
+    self.ship.set_course(destination)  # Call Python method
+    return len(data)
+
+self.vfs.device_handlers['dev_ship_course'] = (course_read, course_write)
+self.vfs.create_device('/dev/ship/course', True, 0, 0, device_name='dev_ship_course')
+```
+
+**Key Principle:** Device files are the ONLY interface between Python and PoohScript.
+
+### Layer 3: PoohScript Commands (Game Logic)
+
+**File: `scripts/bin/warp_to_center`**
+```python
+#!/usr/bin/pooscript
+# Set course toward galactic center
+
+# Read current location
+fd = kernel.open("/proc/ship/location", kernel.O_RDONLY)
+location_data = kernel.read(fd, 4096).decode('utf-8')
+kernel.close(fd)
+
+# Parse position
+current_pos = 0.0
+for line in location_data.split('\n'):
+    if "Position:" in line:
+        current_pos = float(line.split(':')[1].strip().split()[0])
+
+# Set course to center (position 0)
+fd = kernel.open("/dev/ship/course", kernel.O_WRONLY)
+kernel.write(fd, b"0")
+kernel.close(fd)
+
+print(f"✓ Course set to galactic center")
+print(f"  Distance: {current_pos:.1f} units")
+```
+
+**File: `scripts/bin/fire`**
+```python
+#!/usr/bin/pooscript
+# Fire weapon at target
+
+# Check if in combat
+combat_fd = kernel.open("/proc/ship/combat", kernel.O_RDONLY)
+combat_state = kernel.read(combat_fd, 4096).decode('utf-8')
+kernel.close(combat_fd)
+
+if "No active combat" in combat_state:
+    error("No combat active")
+    exit(1)
+
+# Check target
+target_fd = kernel.open("/dev/ship/target", kernel.O_RDONLY)
+target = kernel.read(target_fd, 1024).decode('utf-8').strip()
+kernel.close(target_fd)
+
+# Fire weapon 0
+fire_fd = kernel.open("/dev/ship/fire", kernel.O_WRONLY)
+bytes_written = kernel.write(fire_fd, b"0")
+kernel.close(fire_fd)
+```
+
+### Enemy AI Architecture
+
+**File: `core/enemy_ai.py`**
+
+Creates a virtual filesystem for each enemy ship:
+
+```python
+class EnemyShipFilesystem:
+    def __init__(self, ship_name, ship_type):
+        self.files = {
+            "/proc/ship/hull": "100",
+            "/proc/ship/shields": "4",
+            "/proc/enemy/hull": "30",  # What enemy sees about player
+            "/proc/enemy/shields": "3",
+
+            # AI Scripts (PoohScript!)
+            "/usr/bin/weapon_control": b"#!/usr/bin/pooscript\n...",
+            "/usr/bin/shield_manager": b"#!/usr/bin/pooscript\n...",
+            "/usr/bin/damage_control": b"#!/usr/bin/pooscript\n...",
+            "/usr/bin/tactical_ai": b"#!/usr/bin/pooscript\n...",
+
+            # Automation schedule
+            "/etc/cron/jobs": "/usr/bin/weapon_control\n/usr/bin/shield_manager\n..."
+        }
+```
+
+**Damage Control AI (Smart Bot Management):**
+```python
+# /usr/bin/damage_control on enemy ships
+# Intelligently sends bots to most damaged rooms
+
+systems = ["weapons", "shields", "engines", "oxygen"]
+most_damaged_system = None
+lowest_health = 100.0
+
+for system in systems:
+    sys_data = vfs.read(f"/proc/systems/{system}")
+    if "offline" in sys_data:
+        most_damaged_system = system
+        break
+    # Check for damage indicators
+
+if most_damaged_system:
+    print(f"MOVE_CREW: bot2 {most_damaged_system}")
+    print(f"REPAIR: {most_damaged_system}")
+```
+
+### GUI Architecture (Layer 3 Alternative Interface)
+
+**File: `core/gui/desktop.py`**
+- Window manager (LCARS + GNOME 2 aesthetic)
+- Manages multiple terminal windows
+- All terminals connect to same ShipOS
+
+**File: `core/gui/terminal_widget.py`**
+- Renders terminal with command history
+- Sends commands to ShipOS.execute_command()
+- Displays output from PoohScript execution
+
+**File: `core/gui/map_widget_v2.py`**
+- Galaxy map with navigation buttons
+- Buttons call PoohScript commands:
+  - "WARP TOWARD CENTER" → executes `warp_to_center`
+  - "WARP AWAY FROM CENTER" → executes `warp_from_center`
+  - "STOP" → executes `stop`
+- Displays ship position, velocity, POIs
+
+**File: `core/gui/tactical_widget.py`**
+- FTL-style ship interior view
+- Shows rooms, systems, crew positions
+- Displays combat distance and sensor range
+- Click crew → click room to move (sends command to ShipOS)
+
+**Key Principle:** GUI never directly modifies ship state. It always:
+1. Calls PoohScript commands (`ship_os.execute_command("warp_to_center")`)
+2. Or writes to device files (through PoohScript)
+3. Reads device files to display state
+
+This ensures GUI, terminal, and scripting modes all work identically.
+
+### Data Flow Examples
+
+#### Example 1: Firing a Weapon (GUI Mode)
+
+```
+User clicks "Fire" button in GUI
+    ↓
+GUI calls: ship_os.execute_command("fire 0")
+    ↓
+ShipOS runs: /bin/fire (PoohScript)
+    ↓
+PoohScript opens: /dev/ship/fire
+    ↓
+Device handler checks: weapons system functional?
+    ↓
+Device handler calls: combat_state.fire_player_weapon(0)
+    ↓
+Python combat.py: calculates damage, applies to enemy
+    ↓
+Python updates: enemy.hull -= damage
+    ↓
+VFS updates: /proc/ship/combat reflects new state
+    ↓
+GUI reads: /proc/ship/combat to display updated status
+```
+
+#### Example 2: Enemy AI Deciding to Repair
+
+```
+Game loop: world_manager.update(dt)
+    ↓
+For each enemy: run their /etc/cron/jobs scripts
+    ↓
+Execute: /usr/bin/damage_control (PoohScript)
+    ↓
+PoohScript reads: /proc/systems/weapons (from enemy VFS)
+    ↓
+PoohScript detects: weapons offline
+    ↓
+PoohScript writes: "MOVE_CREW: bot2 weapons"
+    ↓
+Output parsed by world_manager
+    ↓
+Python calls: enemy_bot.assign_to_room(weapons_room)
+    ↓
+Enemy VFS updates: /proc/crew/bot2 location
+    ↓
+Next frame: bot repairs weapons automatically (in Ship.update())
+```
+
+#### Example 3: Galaxy Navigation
+
+```
+User clicks "WARP TOWARD CENTER" button in GUI
+    ↓
+GUI calls: ship_os.execute_command("warp_to_center")
+    ↓
+ShipOS runs: /bin/warp_to_center (PoohScript)
+    ↓
+PoohScript opens: /proc/ship/location (reads position)
+    ↓
+PoohScript opens: /dev/ship/course (writes "0")
+    ↓
+Device handler calls: ship.set_course(0.0)
+    ↓
+Python sets: ship.target_position = 0.0
+              ship.is_traveling = True
+              ship.velocity = -ship.get_current_speed()
+    ↓
+Each frame: ship.update_position(dt) moves ship toward center
+    ↓
+GUI map widget reads: /proc/ship/sensors to display position
+```
+
+### Combat System Details
+
+**Combat Distance System:**
+- Combat starts at distance 5.0 units
+- Player can move closer (min 0.5) or away (max 10.0)
+- Weapons have ranges (laser: 8.0, missile: 15.0, beam: 6.0)
+- Sensors have 30 unit range for detecting enemies
+
+**Pursuit Mechanics:**
+- Player can flee combat (`retreat` command repeatedly)
+- Enemy pursues based on speed differential
+- If player gets beyond sensor range (30 units): enemy fades away
+- If player gets beyond escape threshold (50 units): enemy gives up
+- If enemy catches up (<2 units): combat re-engages
+
+**Damage System:**
+- Shields absorb damage first
+- Targeted system damage: each point = 5% system health lost
+- System destroyed: 20% of weapon damage spills to hull
+- Untargeted shots: full damage to hull
+- Systems with crew work at 100% + bonuses
+- Systems without crew work at 25% effectiveness
+
+### Power System Architecture
+
+**Power Generation:**
+```python
+# base_power = reactor_power (e.g., 8)
+# reactor_health affects output
+available_power = int(reactor_power * reactor.health)
+
+# Crew in reactor add bonus (+1 per crew)
+if reactor.crew:
+    available_power += len(reactor.crew)
+```
+
+**Power Allocation:**
+```python
+# Each system can receive 0-3 power
+# Total allocated cannot exceed available_power
+# If reactor damaged: power drops, systems fail
+```
+
+**System Effectiveness:**
+```python
+effectiveness = health × (power / max_power) × (1.0 + crew_bonus)
+# Without crew: effectiveness × 0.25 (automated mode)
+# With crew: full effectiveness + 10% per skill level
+```
+
+### Galaxy System Architecture
+
+**Linear Galaxy (1D):**
+```
+Outer Rim (pos: 1000) ←→ Galactic Center (pos: 0)
+[Easy enemies]            [Hard enemies, boss]
+
+- Ship position: distance from center (0.0 to 1000.0)
+- Difficulty: 1.0 - (position / 1000.0)
+- POIs scattered throughout at fixed positions
+- Ship travels continuously (velocity × dt)
+```
+
+**Movement:**
+```python
+ship.set_course(target_position)
+# Each frame:
+ship.position += ship.velocity * dt
+# When ship.position reaches target_position:
+ship.stop_traveling()
+```
+
+### Repair Balance
+
+**Recent Change: Repair Speed Reduced**
+- Old rate: 0.2 per second (very fast)
+- New rate: 0.02 per second (10× slower)
+- **Reason:** Rooms were nearly invulnerable if a bot was present
+- **Effect:** Focused fire on one system can now destroy it despite repairs
+- **Balance:** Makes targeting strategic, rewards player's smart choices
+
+### File Organization Rules
+
+**Adding New Features:**
+
+1. **Physics/Calculation** → `core/*.py`
+   - Example: Calculating shield recharge rate
+   - Example: Weapon damage falloff with distance
+
+2. **Game Behavior** → `scripts/bin/*` or enemy AI
+   - Example: When to repair which system
+   - Example: Flee if hull < 20%
+   - Example: Target enemy weapons first
+
+3. **Player Commands** → `scripts/bin/command_name`
+   - Always PoohScript
+   - Always read/write device files
+   - Never import Python modules
+
+4. **Device Files** → `core/ship_os.py`
+   - Add new /proc/ file to expose Python state
+   - Add new /dev/ file to accept commands
+   - Device handler bridges PoohScript ↔ Python
+
+5. **GUI Elements** → `core/gui/*`
+   - Call ship_os.execute_command() for actions
+   - Read device files for display
+   - Never call ship methods directly
+
+---
 
 ## 🎨 Ships Available
 
@@ -506,3 +1083,91 @@ GitHub: https://github.com/ruapotato/SpaceCMD
 ---
 
 **"Everything is a file. Everything is hackable. Crew are autonomous bots. Welcome aboard, Captain."**
+
+---
+
+## 🔧 TODO - Active Development Tasks
+
+### Critical Fixes
+- [ ] **Fix crew bonuses for weapon damage** - Weapons should do more damage with more crew assigned
+- [ ] **Adjust hull damage threshold** - Ship should explode when 75% of systems are destroyed
+- [ ] **Fix window maximize and resizing** - Window maximize button and resize functionality broken
+- [ ] **Create persistent tactical command terminal** - One terminal window that can't be closed, executes all tactical commands
+
+### Visual Improvements
+- [ ] **Enhanced weapon fire graphics** - Show clear lines from weapon rooms to target rooms
+- [ ] **FTL-style segmented ship layouts** - Replace rectangle rooms with proper ship shapes like FTL
+- [ ] **Multi-enemy tactical display** - Support displaying 2+ enemy ships simultaneously
+- [ ] **Better damage indicators** - Show which rooms are being hit in real-time
+
+### New Ship Systems
+- [ ] **Add Computer Core component** - Required ship system for all ships
+  - Without Computer Core, ship is disabled
+  - Can be targeted and destroyed in combat
+  - Crew can be teleported to enemy ships to interface with their Computer Core
+- [ ] **Add Teleporter module** - Purchasable upgrade
+  - Allows crew teleportation to enemy ships
+  - Crew can fight enemy crew/robots
+  - Crew can hack enemy Computer Core
+  - Options: Take over enemy ship, disable it, or destroy it
+
+### Boarding & Hacking Mechanics
+- [ ] **Implement crew teleportation** - Send crew to enemy ship
+- [ ] **Crew vs. crew combat** - Fighting system when boarding
+- [ ] **Computer Core interface** - Hacking minigame or script interface
+- [ ] **Ship takeover mechanics** - Control captured enemy ships
+- [ ] **Ship disabling** - Leave enemy ship adrift without destroying it
+
+### UI/UX Improvements
+- [ ] **Remove/hide galaxy map window** - No longer needed or confusing
+- [ ] **Pipe tactical commands to terminal** - Show all tactical clicks as terminal commands
+- [ ] **Improve crew assignment UI** - Better visual feedback for crew bonuses
+- [ ] **Add ship templates** - Pre-designed ship layouts for variety
+
+### Balance & Polish
+- [ ] **Crew skill progression** - Crew gain experience and improve over time
+- [ ] **System upgrade tiers** - Weapons/shields/engines can be upgraded
+- [ ] **Enemy variety** - More enemy ship types with unique layouts
+- [ ] **Boss encounters** - Special enemy ships with unique mechanics
+
+### Documentation
+- [x] **Create comprehensive TODO in README** - This section!
+- [ ] **Document Computer Core mechanics** - Add to README when implemented
+- [ ] **Document Teleporter mechanics** - Add to README when implemented
+- [ ] **Update GUI_README.md** - Document new tactical features
+
+---
+
+### Implementation Priority (for fresh context windows)
+
+**Phase 1 - Critical Fixes:**
+1. Fix crew weapon damage bonuses (core/weapons.py)
+2. Fix hull damage threshold (core/combat.py)
+3. Fix window maximize (core/gui/window.py)
+
+**Phase 2 - Tactical Improvements:**
+4. Create persistent tactical terminal (core/gui/desktop.py)
+5. Enhanced weapon graphics (core/gui/tactical_widget.py)
+6. Multi-enemy support (core/gui/tactical_widget.py, core/combat.py)
+
+**Phase 3 - New Systems:**
+7. Add Computer Core (core/ship.py, core/ship_os.py)
+8. Add Teleporter module (core/ship.py, core/teleporter.py)
+9. Implement boarding mechanics (core/boarding.py)
+
+**Phase 4 - Visual Overhaul:**
+10. FTL-style ship layouts (core/gui/tactical_widget.py)
+11. Remove galaxy map (core/gui/desktop.py)
+12. Better damage/combat visuals
+
+---
+
+### How to Continue Development
+
+If starting a fresh context window:
+1. Read this README.md for full architecture
+2. Check the TODO section above for current priorities
+3. Focus on one phase at a time
+4. Test each feature thoroughly before moving on
+
+---

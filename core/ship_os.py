@@ -197,11 +197,22 @@ Crew: {len(self.ship.crew)}
         self.vfs.device_handlers['proc_ship_status'] = (ship_status_read, lambda data: 0)
         self.vfs.create_device('/proc/ship/status', True, 0, 0, device_name='proc_ship_status')
 
-        # /proc/ship/power - power allocation info
+        # /proc/ship/power - power allocation info (includes crew bonuses!)
         def power_info_read(size):
-            info = f"Total: {self.ship.reactor_power}\n"
+            total_power = self.ship.get_available_power() if hasattr(self.ship, 'get_available_power') else self.ship.reactor_power
+            allocated = total_power - self.ship.power_available
+
+            info = f"Total: {total_power}\n"
             info += f"Available: {self.ship.power_available}\n"
-            info += f"Allocated: {self.ship.reactor_power - self.ship.power_available}\n"
+            info += f"Allocated: {allocated}\n"
+
+            # Show reactor bonus if present
+            if hasattr(self.ship, 'get_available_power'):
+                base_power = self.ship.reactor_power
+                bonus = total_power - base_power
+                if bonus > 0:
+                    info += f"Reactor Bonus: +{bonus} (crew in reactor)\n"
+
             return info.encode('utf-8')
 
         self.vfs.device_handlers['proc_ship_power'] = (power_info_read, lambda data: 0)
@@ -285,6 +296,26 @@ SYSTEMS:
 
         self.vfs.device_handlers['proc_ship_enemy'] = (enemy_read, lambda data: 0)
         self.vfs.create_device('/proc/ship/enemy', True, 0, 0, device_name='proc_ship_enemy')
+
+        # /proc/ship/enemy_position - enemy's galaxy position (for AI pursuit decisions)
+        def enemy_position_read(size):
+            if not self.world_manager or not self.world_manager.is_in_combat():
+                return b"No enemy detected\n"
+
+            enemy = self.world_manager.combat_state.enemy_ship
+            enemy_pos = enemy.galaxy_distance_from_center
+            player_pos = self.ship.galaxy_distance_from_center
+            distance = abs(enemy_pos - player_pos)
+
+            info = f"""=== ENEMY POSITION ===
+Enemy Position: {enemy_pos:.1f}
+Player Position: {player_pos:.1f}
+Galaxy Distance: {distance:.1f}
+"""
+            return info.encode('utf-8')
+
+        self.vfs.device_handlers['proc_ship_enemy_position'] = (enemy_position_read, lambda data: 0)
+        self.vfs.create_device('/proc/ship/enemy_position', True, 0, 0, device_name='proc_ship_enemy_position')
 
         # /dev/ship/beacon - distress beacon control (attracts enemies!)
         def beacon_read(size):
@@ -439,53 +470,63 @@ SYSTEMS:
         self.vfs.device_handlers['dev_ship_crew_assign'] = (crew_assign_read, crew_assign_write)
         self.vfs.create_device('/dev/ship/crew_assign', True, 0, 0, device_name='dev_ship_crew_assign')
 
-        # /proc/ship/location - current map location
+        # /proc/ship/location - current galaxy position
         def location_read(size):
             if not self.world_manager:
                 return b"No navigation data\n"
 
-            node = self.world_manager.world_map.get_current_node()
-            if not node:
-                return b"Unknown location\n"
+            position = self.ship.galaxy_distance_from_center
+            difficulty = self.world_manager.galaxy.get_difficulty(position)
 
-            info = f"""=== CURRENT LOCATION ===
-Node: {node.id}
-Type: {node.type.value}
-Sector: {node.sector + 1}/{self.world_manager.world_map.num_sectors}
-Visited: {'Yes' if node.visited else 'No'}
+            info = f"""=== GALAXY POSITION ===
+Position: {position:.1f} units from center
+Distance to Center: {position:.1f}
+Difficulty: {difficulty:.1%}
+Max Galaxy Distance: {self.world_manager.galaxy.max_distance:.1f}
 """
+            # Check if at a POI
+            poi = self.world_manager.galaxy.check_poi_proximity(position, threshold=5.0)
+            if poi:
+                info += f"\nCurrent POI: {poi.name} ({poi.type.value})\n"
+
             return info.encode('utf-8')
 
         self.vfs.device_handlers['proc_ship_location'] = (location_read, lambda data: 0)
         self.vfs.create_device('/proc/ship/location', True, 0, 0, device_name='proc_ship_location')
 
-        # /proc/ship/sensors - sensor data (requires sensors to be functional)
+        # /proc/ship/sensors - sensor data (linear galaxy + nearby POIs)
         def sensors_read(size):
-            # Check if sensors system is functional
-            sensors_online = False
-            if SystemType.SENSORS in self.ship.systems:
-                sensors_system = self.ship.systems[SystemType.SENSORS]
-                sensors_online = sensors_system.is_online()
+            # Sensors work without system check (basic sensors always available)
+            # Advanced features could require sensors system later
 
-            if not sensors_online:
-                return b"SENSORS OFFLINE - No sensor data available\n"
+            position = self.ship.galaxy_distance_from_center
+            velocity = self.ship.velocity
+            speed = self.ship.get_current_speed() if hasattr(self.ship, 'get_current_speed') else self.ship.speed
 
-            # Sensors are online - provide detailed galaxy position
             info = f"""=== SENSOR READOUT ===
-Galaxy Position: {self.ship.galaxy_distance_from_center:.1f} units from galactic center
-Ship Speed: {self.ship.speed:.2f} units/sec (max: {self.ship.max_speed:.2f})
+Position: {position:.1f} units from galactic center
+Velocity: {velocity:.2f} units/sec
+Current Speed: {speed:.2f} units/sec
+"""
 
-"""
-            # Add current node info if world_manager available
+            # Show course if set
+            if hasattr(self.ship, 'target_position') and self.ship.target_position is not None:
+                distance_to_dest = abs(self.ship.target_position - position)
+                direction = "toward center" if self.ship.target_position < position else "toward rim"
+                info += f"Course: {self.ship.target_position:.1f} ({direction}, {distance_to_dest:.1f} units away)\n"
+
+            # Add nearby POIs if world_manager available
             if self.world_manager:
-                node = self.world_manager.world_map.get_current_node()
-                if node:
-                    info += f"""Current Node: {node.id}
-Node Type: {node.type.value}
-Sector: {node.sector + 1}/{self.world_manager.world_map.num_sectors}
-Difficulty: {node.difficulty}
-Distance from Center: {node.distance_from_center:.1f}
-"""
+                info += "\n=== NEARBY POINTS OF INTEREST ===\n"
+                nearby_pois = self.world_manager.galaxy.get_nearby_pois(position, range_distance=100.0)
+                if nearby_pois:
+                    for poi in nearby_pois[:5]:  # Show top 5 closest
+                        distance = abs(poi.position - position)
+                        visited = "✓" if poi.visited else " "
+                        info += f"[{visited}] {poi.name:20} {poi.type.value:10} @ {poi.position:.1f} ({distance:.1f} away)\n"
+                else:
+                    info += "No POIs detected in range\n"
+
             # Add combat distance info if in combat
             if self.world_manager and self.world_manager.is_in_combat():
                 info += "\n=== COMBAT SENSORS ===\n"
@@ -507,41 +548,69 @@ Distance from Center: {node.distance_from_center:.1f}
         self.vfs.device_handlers['proc_ship_sensors'] = (sensors_read, lambda data: 0)
         self.vfs.create_device('/proc/ship/sensors', True, 0, 0, device_name='proc_ship_sensors')
 
-        # /proc/ship/jumps - available jump destinations
-        def jumps_read(size):
+        # /proc/ship/pois - nearby points of interest (extended range)
+        def pois_read(size):
             if not self.world_manager:
                 return b"No navigation data\n"
 
-            available = self.world_manager.get_available_jumps()
-            if not available:
-                return b"No jump destinations available\n"
+            position = self.ship.galaxy_distance_from_center
+            nearby_pois = self.world_manager.galaxy.get_nearby_pois(position, range_distance=200.0)
 
-            info = "=== AVAILABLE JUMPS ===\n"
-            for node in available:
-                visited = "VISITED" if node.visited else "UNVISITED"
-                info += f"  {node.id:8} {node.type.value:12} Sector {node.sector + 1}  [{visited}]\n"
+            if not nearby_pois:
+                return b"No POIs detected in extended range\n"
+
+            info = "=== POINTS OF INTEREST (200 unit range) ===\n"
+            for poi in nearby_pois:
+                distance = abs(poi.position - position)
+                visited = "✓" if poi.visited else " "
+                direction = "←" if poi.position < position else "→"
+                info += f"[{visited}] {direction} {poi.name:25} {poi.type.value:10} @ {poi.position:7.1f} ({distance:6.1f} away)\n"
 
             return info.encode('utf-8')
 
-        self.vfs.device_handlers['proc_ship_jumps'] = (jumps_read, lambda data: 0)
-        self.vfs.create_device('/proc/ship/jumps', True, 0, 0, device_name='proc_ship_jumps')
+        self.vfs.device_handlers['proc_ship_pois'] = (pois_read, lambda data: 0)
+        self.vfs.create_device('/proc/ship/pois', True, 0, 0, device_name='proc_ship_pois')
 
-        # /dev/ship/jump - execute jump (write node ID)
-        def jump_write(data):
-            """Write node ID to jump to that node"""
+        # /dev/ship/course - set course destination (write position)
+        def course_read(size):
+            if hasattr(self.ship, 'target_position') and self.ship.target_position is not None:
+                return f"{self.ship.target_position:.1f}\n".encode('utf-8')
+            return b"No course set\n"
+
+        def course_write(data):
+            """Write destination position to set course"""
             if not self.world_manager:
                 return -1
 
             try:
-                node_id = data.decode('utf-8').strip()
-                if self.world_manager.jump_to_node(node_id):
+                destination = float(data.decode('utf-8').strip())
+                # Clamp to galaxy bounds
+                destination = max(0.0, min(self.world_manager.galaxy.max_distance, destination))
+                self.ship.set_course(destination)
+                return len(data)
+            except:
+                return -1
+
+        self.vfs.device_handlers['dev_ship_course'] = (course_read, course_write)
+        self.vfs.create_device('/dev/ship/course', True, 0, 0, device_name='dev_ship_course')
+
+        # /dev/ship/stop - emergency stop (halt all movement)
+        def stop_read(size):
+            traveling = "YES" if self.ship.is_traveling else "NO"
+            return f"Traveling: {traveling}\n".encode('utf-8')
+
+        def stop_write(data):
+            """Write anything to stop the ship"""
+            try:
+                if hasattr(self.ship, 'stop_traveling'):
+                    self.ship.stop_traveling()
                     return len(data)
                 return -1
             except:
                 return -1
 
-        self.vfs.device_handlers['dev_ship_jump'] = (lambda size: b"Write node ID to jump\n", jump_write)
-        self.vfs.create_device('/dev/ship/jump', True, 0, 0, device_name='dev_ship_jump')
+        self.vfs.device_handlers['dev_ship_stop'] = (stop_read, stop_write)
+        self.vfs.create_device('/dev/ship/stop', True, 0, 0, device_name='dev_ship_stop')
 
         # /proc/ship_info - detailed ship statistics
         def ship_info_read(size):

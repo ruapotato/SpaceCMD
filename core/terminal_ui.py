@@ -315,6 +315,10 @@ class TerminalUI:
         self.command_history = []
         self.max_history_lines = self.terminal_height - 1
 
+        # Combat state info for tactical display
+        self.combat_distance = None
+        self.sensor_range = 30.0  # Default sensor range
+
     def _get_terminal_size(self) -> Tuple[int, int]:
         """Get terminal dimensions"""
         size = shutil.get_terminal_size((80, 24))
@@ -381,7 +385,20 @@ class TerminalUI:
         """Render tactical map section"""
         # Tactical border
         print(f"{Color.PINK}╔{'═' * (self.width - 2)}╗{Color.RESET}")
-        print(f"{Color.PINK}║{Color.RESET} {Color.YELLOW}TACTICAL DISPLAY{Color.RESET}{' ' * (self.width - 20)} {Color.PINK}║{Color.RESET}")
+
+        # Header with combat info
+        header = f" {Color.YELLOW}TACTICAL DISPLAY{Color.RESET}"
+
+        # Add combat distance and sensor range if in combat
+        combat_info = ""
+        if hasattr(self, 'combat_distance') and self.combat_distance is not None:
+            combat_info = f" │ {Color.CYAN}DIST:{self.combat_distance:.1f}{Color.RESET} │ {Color.GREEN}SENSOR:{self.sensor_range:.1f}{Color.RESET}"
+
+        # Calculate padding
+        header_len = 17 + len(combat_info)  # Approx length without color codes
+        padding = self.width - header_len - 4
+
+        print(f"{Color.PINK}║{Color.RESET}{header}{combat_info}{' ' * max(0, padding)} {Color.PINK}║{Color.RESET}")
         print(f"{Color.PINK}╠{'═' * (self.width - 2)}╣{Color.RESET}")
 
         # Render tactical map
@@ -455,6 +472,11 @@ class TerminalUI:
     def set_player_ship_name(self, name: str):
         """Update player ship name in tactical display"""
         self.tactical_map.player_ship.name = name
+
+    def set_combat_info(self, distance: float, sensor_range: float = 30.0):
+        """Update combat distance and sensor range for tactical display"""
+        self.combat_distance = distance
+        self.sensor_range = sensor_range
 
 
 class SimpleTextEditor:

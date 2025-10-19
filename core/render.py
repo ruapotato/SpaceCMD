@@ -67,9 +67,8 @@ class Icons:
     WEAPONS_LASER = "🔴"
     WEAPONS_MISSILE = "🚀"
     ENGINES = "⚙️"
-    OXYGEN = "💨"
     REACTOR = "⚡"
-    MEDBAY = "💉"
+    REPAIR_BAY = "🔧"
     SENSORS = "📡"
     TELEPORTER = "🌀"
     CLOAKING = "▓"
@@ -255,8 +254,6 @@ class ShipRenderer:
             status = Icons.FIRE
         elif room.breached:
             status = Icons.WARNING
-        elif room.oxygen_level < 0.3:
-            status = Icons.WARNING
 
         return f"{name_str} {icon} {health_bar} {power_str} {crew_str} {status}"
 
@@ -267,9 +264,8 @@ class ShipRenderer:
             SystemType.SHIELDS: Icons.SHIELDS,
             SystemType.WEAPONS: Icons.WEAPONS_LASER,
             SystemType.ENGINES: Icons.ENGINES,
-            SystemType.OXYGEN: Icons.OXYGEN,
             SystemType.REACTOR: Icons.REACTOR,
-            SystemType.MEDBAY: Icons.MEDBAY,
+            SystemType.REPAIR_BAY: Icons.REPAIR_BAY,
             SystemType.SENSORS: Icons.SENSORS,
             SystemType.TELEPORTER: Icons.TELEPORTER,
             SystemType.CLOAKING: Icons.CLOAKING,

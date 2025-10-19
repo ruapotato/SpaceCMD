@@ -2,8 +2,8 @@
 World Manager - Controls the game world outside the ship
 
 This is the Python layer that controls:
-- World map and navigation
-- Enemy spawning
+- Linear galaxy simulation
+- Enemy spawning (with ShipOS instances!)
 - Random encounters
 - World events
 - Environmental hazards
@@ -16,7 +16,8 @@ The world manager controls everything external to the ship.
 import random
 import time
 from typing import Optional, Callable
-from .world_map import WorldMap, NodeType
+from .linear_galaxy import LinearGalaxy, POIType
+from .enemy_ships import create_enemy_with_os
 
 
 class WorldManager:
@@ -27,43 +28,41 @@ class WorldManager:
     WorldManager controls the world around the ship.
     """
 
-    def __init__(self, ship_os, num_sectors: int = 8):
+    def __init__(self, ship_os, max_galaxy_distance: float = 1000.0):
         """
         Initialize world manager.
 
         Args:
             ship_os: The ShipOS instance (for monitoring ship state)
-            num_sectors: Number of sectors in the map
+            max_galaxy_distance: Size of the galaxy (distance from center to outer rim)
         """
         self.ship_os = ship_os
         self.ship = ship_os.ship
 
-        # World Map
-        self.world_map = WorldMap(num_sectors=num_sectors, nodes_per_sector=8)
+        # Linear Galaxy (1D galaxy from center to outer rim)
+        self.galaxy = LinearGalaxy(max_distance=max_galaxy_distance)
 
-        # Initialize ship position to starting node
-        starting_node = self.world_map.get_current_node()
-        if starting_node:
-            self.ship.galaxy_distance_from_center = starting_node.distance_from_center
+        # Initialize ship position to outer rim (start position)
+        self.ship.galaxy_distance_from_center = max_galaxy_distance
 
         # Combat state
         self.combat_state = None
-        self.enemy_ship = None
+        self.enemy_ship = None  # EnemyShipWithOS instance (enemy computer!)
 
         # World state
         self.distress_beacon_active = False  # Ship broadcasting distress
         self.scan_signature_high = False     # Ship has high scan signature
         self.last_encounter_time = 0
-        self.encounter_cooldown = 30.0  # Seconds between encounters
+        self.encounter_cooldown = 10.0  # Seconds between encounters (was 30.0)
 
         # Callbacks
         self.on_attack_callback = None  # Called when ship takes damage
         self.on_encounter_start = None  # Called when encounter begins
         self.on_encounter_end = None    # Called when encounter ends
-        self.on_jump_complete = None    # Called when jump completes
+        self.on_poi_arrival = None      # Called when arriving at POI
 
-        # Encounter probability
-        self.base_encounter_chance = 0.0  # 0% by default
+        # Encounter probability (chance per second of enemy encounter while traveling)
+        self.base_encounter_chance = 0.05  # 5% per second while moving (was 1%)
         self.encounter_multiplier = 1.0
 
     def set_distress_beacon(self, active: bool):
@@ -90,12 +89,12 @@ class WorldManager:
         else:
             self.encounter_multiplier = 1.0
 
-    def trigger_encounter(self, enemy_type: str = "gnat", forced: bool = False):
+    def trigger_encounter(self, enemy_type: str = None, forced: bool = False):
         """
         Spawn an enemy encounter.
 
         Args:
-            enemy_type: Type of enemy to spawn
+            enemy_type: Type of enemy to spawn (None = auto-select based on difficulty)
             forced: If True, bypass cooldown and probability checks
         """
         # Check cooldown
@@ -108,28 +107,35 @@ class WorldManager:
         if self.combat_state and self.combat_state.active:
             return False
 
-        # Create enemy
-        from core.enemy_ships import ENEMY_SHIPS
-        from core.combat import CombatState
+        # Auto-select enemy type based on position if not specified
+        if enemy_type is None:
+            enemy_type = self.galaxy.get_enemy_type_for_position(self.ship.galaxy_distance_from_center)
 
-        if enemy_type in ENEMY_SHIPS:
-            self.enemy_ship = ENEMY_SHIPS[enemy_type]()
-        else:
-            self.enemy_ship = ENEMY_SHIPS["gnat"]()
+        # Create enemy WITH OS (enemies are computers running hostile AI!)
+        self.enemy_ship = create_enemy_with_os(enemy_type)
+
+        # Spawn enemy at sensor range distance (15-25 units away)
+        # This gives player a chance to react and potentially outrun them!
+        spawn_distance = random.uniform(15, 25)
+        # Spawn ahead or behind player randomly
+        direction = random.choice([-1, 1])
+        self.enemy_ship.ship.galaxy_position = self.ship.galaxy_position + (spawn_distance * direction)
+        self.enemy_ship.ship.galaxy_distance_from_center = self.enemy_ship.ship.galaxy_position
 
         # Start combat
-        self.combat_state = CombatState(self.ship, self.enemy_ship)
+        from core.combat import CombatState
+        self.combat_state = CombatState(self.ship, self.enemy_ship.ship)
         self.last_encounter_time = time.time()
 
         # Notify
         print(f"\n⚠️  ALERT: Hostile ship detected!")
-        print(f"    {self.enemy_ship.name} is attacking!")
-        print(f"    Hull: {self.enemy_ship.hull}/{self.enemy_ship.hull_max}")
-        print(f"    Shields: {int(self.enemy_ship.shields)}/{self.enemy_ship.shields_max}")
+        print(f"    {self.enemy_ship.ship.name} is attacking!")
+        print(f"    Hull: {self.enemy_ship.ship.hull}/{self.enemy_ship.ship.hull_max}")
+        print(f"    Shields: {int(self.enemy_ship.ship.shields)}/{self.enemy_ship.ship.shields_max}")
         print()
 
         if self.on_encounter_start:
-            self.on_encounter_start(self.enemy_ship)
+            self.on_encounter_start(self.enemy_ship.ship)
 
         return True
 
@@ -142,42 +148,79 @@ class WorldManager:
         """
         # Track previous hull for damage detection
         prev_hull = self.ship.hull
+        prev_position = self.ship.galaxy_distance_from_center
 
-        # Update combat if active
-        if self.combat_state and self.combat_state.active:
+        # Update ship position (if moving and not in combat)
+        if not (self.combat_state and self.combat_state.active):
+            self.ship.update_position(dt)
+
+        # Check if we arrived at a POI
+        if abs(self.ship.galaxy_distance_from_center - prev_position) > 0.1:
+            poi = self.galaxy.check_poi_proximity(self.ship.galaxy_distance_from_center, threshold=5.0)
+            if poi and not poi.visited:
+                poi.visited = True
+                self._handle_poi_arrival(poi)
+
+        # Update combat if exists (could be active or inactive due to distance)
+        if self.combat_state:
+            # Run enemy AI if combat is active
+            if self.combat_state.active and self.enemy_ship:
+                self.enemy_ship.run_ai_turn()
+
+            # Update combat physics (handles engagement/disengagement)
             self.combat_state.update(dt)
 
-            # Check if player took damage
-            if self.ship.hull < prev_hull:
+            # Check if player took damage (only during active combat)
+            if self.combat_state.active and self.ship.hull < prev_hull:
                 if self.on_attack_callback:
                     damage_intensity = min(1.0, (prev_hull - self.ship.hull) / 5.0)
                     self.on_attack_callback(damage_intensity, (255, 0, 0))
 
-            # Check if combat ended
-            if not self.combat_state.active:
-                if self.ship.hull <= 0:
-                    print("\n💀 SHIP DESTROYED!")
-                    print("    Game Over!")
-                    print()
-                elif self.enemy_ship.hull <= 0:
-                    print(f"\n✓ {self.enemy_ship.name} destroyed!")
-                    print(f"  +{self.enemy_ship.scrap} scrap collected")
-                    print()
-                    self.ship.scrap += self.enemy_ship.scrap
+            # Clean up combat state if truly ended (death or full escape)
+            galaxy_distance = abs(self.combat_state.player_galaxy_position - self.combat_state.enemy_galaxy_position)
 
-                    if self.on_encounter_end:
-                        self.on_encounter_end(victory=True)
+            if self.ship.hull <= 0:
+                print("\n💀 SHIP DESTROYED!")
+                print("    Game Over!")
+                print()
+                self.combat_state = None
+                self.enemy_ship = None
+            elif self.enemy_ship.ship.hull <= 0:
+                print(f"\n✓ {self.enemy_ship.ship.name} destroyed!")
+                print(f"  +{self.enemy_ship.ship.scrap} scrap collected")
+                print()
+                self.ship.scrap += self.enemy_ship.ship.scrap
 
-                    self.combat_state = None
-                    self.enemy_ship = None
+                if self.on_encounter_end:
+                    self.on_encounter_end(victory=True)
 
-        # Random encounters (if beacon active or high signature)
+                self.combat_state = None
+                self.enemy_ship = None
+            elif galaxy_distance > self.combat_state.sensor_range:
+                # Fully escaped - enemy lost on sensors
+                print(f"\n✓ Escaped! Enemy beyond sensor range ({galaxy_distance:.1f} units)")
+                print()
+                if self.on_encounter_end:
+                    self.on_encounter_end(victory=False)
+
+                self.combat_state = None
+                self.enemy_ship = None
+
+        # Random encounters (while traveling OR when beacon is active)
         else:
-            if self.distress_beacon_active or self.scan_signature_high:
-                # Check for random encounter
+            # Check for random encounter
+            # Normally requires movement, but beacon attracts enemies even when stationary!
+            is_moving = abs(self.ship.velocity) > 0.1
+            if is_moving or self.distress_beacon_active:
                 encounter_chance = self.base_encounter_chance * self.encounter_multiplier * dt
+                # Higher chance if beacon active or high signature
+                if self.distress_beacon_active:
+                    encounter_chance *= 10.0
+                elif self.scan_signature_high:
+                    encounter_chance *= 3.0
+
                 if random.random() < encounter_chance:
-                    self.trigger_encounter("gnat")
+                    self.trigger_encounter()
 
     def get_combat_state(self):
         """Get current combat state (for UI display)"""
@@ -188,89 +231,25 @@ class WorldManager:
         return self.combat_state is not None and self.combat_state.active
 
     # =========================================================================
-    # MAP NAVIGATION
+    # GALAXY NAVIGATION
     # =========================================================================
 
-    def jump_to_node(self, node_id: str) -> bool:
-        """
-        Jump to a new node on the map.
-
-        Args:
-            node_id: ID of node to jump to
-
-        Returns:
-            True if jump successful
-        """
-        # Can't jump during combat
-        if self.is_in_combat():
-            return False
-
-        # Try to jump
-        if not self.world_map.jump_to_node(node_id):
-            return False
-
-        # Use some fuel
-        fuel_cost = 1
-        if self.ship.dark_matter >= fuel_cost:
-            self.ship.dark_matter -= fuel_cost
-
-        # Update ship's galaxy position (distance from center)
-        current_node = self.world_map.get_current_node()
-        if current_node:
-            self.ship.galaxy_distance_from_center = current_node.distance_from_center
-
-        # Handle arrival at new node
-        self._handle_node_arrival()
-
-        # Callback
-        if self.on_jump_complete:
-            self.on_jump_complete(self.world_map.get_current_node())
-
-        return True
-
-    def _handle_node_arrival(self):
-        """Handle what happens when arriving at a new node"""
-        node = self.world_map.get_current_node()
-        if not node:
-            return
-
+    def _handle_poi_arrival(self, poi):
+        """Handle what happens when arriving at a POI"""
         print(f"\n{'='*60}")
-        print(f"ARRIVED AT: {node.type.value.upper()} (Sector {node.sector + 1})")
+        print(f"ARRIVED AT: {poi.name.upper()}")
+        print(f"Position: {poi.position:.1f} (difficulty: {self.galaxy.get_difficulty(poi.position):.1%})")
         print(f"{'='*60}\n")
 
-        # Handle based on node type
-        if node.type == NodeType.EMPTY:
-            print("Nothing here. All clear.")
-            print()
-
-        elif node.type == NodeType.COMBAT:
-            print(f"⚠️  Enemy ship detected!")
-            print()
-            self.trigger_encounter(node.enemy_type, forced=True)
-
-        elif node.type == NodeType.ELITE_COMBAT:
-            print(f"⚠️  ELITE ENEMY detected!")
-            print("This will be a tough fight...")
-            print()
-            self.trigger_encounter(node.enemy_type, forced=True)
-
-        elif node.type == NodeType.STORE:
+        # Handle based on POI type
+        if poi.type == POIType.STORE:
             print("🏪 Merchant ship detected!")
             print("Type 'store' to browse their wares")
             print()
 
-        elif node.type == NodeType.EVENT:
-            print("📡 Receiving transmission...")
-            self._trigger_random_event()
-
-        elif node.type == NodeType.DISTRESS:
-            print("📡 Distress beacon detected!")
-            print("Someone needs help... or is it a trap?")
-            print()
-
-        elif node.type == NodeType.REPAIR:
+        elif poi.type == POIType.REPAIR:
             print("🔧 Repair station found!")
-            repair_amount = 5
+            repair_amount = 10
             old_hull = self.ship.hull
             self.ship.hull = min(self.ship.hull_max, self.ship.hull + repair_amount)
             healed = self.ship.hull - old_hull
@@ -278,22 +257,65 @@ class WorldManager:
                 print(f"Hull repaired: +{healed} HP")
             print()
 
-        elif node.type == NodeType.NEBULA:
+        elif poi.type == POIType.DISTRESS:
+            print("📡 Distress beacon detected!")
+            print("Someone needs help... or is it a trap?")
+            # 50% chance of encounter
+            if random.random() < 0.5:
+                print("⚠️  It's an ambush!")
+                self.trigger_encounter(forced=True)
+            else:
+                print("✓ Found supplies in the wreckage")
+                self._trigger_scrap_reward(random.randint(10, 20))
+            print()
+
+        elif poi.type == POIType.NEBULA:
             print("🌫️  Entering nebula...")
             print("⚠️  WARNING: Shields offline in nebula!")
             self.ship.shields = 0
             print()
 
-        elif node.type == NodeType.ASTEROID:
+        elif poi.type == POIType.ASTEROID:
             print("☄️  Asteroid field!")
             print("⚠️  Navigation is hazardous here")
+            # Small chance of damage
+            if random.random() < 0.3:
+                damage = random.randint(1, 3)
+                self.ship.hull = max(0, self.ship.hull - damage)
+                print(f"💥 Hull damaged by asteroid! -{damage} HP")
             print()
 
-        elif node.type == NodeType.BOSS:
-            print("⚠️  ⚠️  ⚠️  BOSS ENCOUNTER! ⚠️  ⚠️  ⚠️")
-            print("This is it. The final battle!")
+        elif poi.type == POIType.STATION:
+            print("🏛️  Space station!")
+            print("Safe haven. You can repair and resupply here.")
+            print("Type 'store' to browse station inventory")
             print()
-            # TODO: Implement boss encounter
+
+        elif poi.type == POIType.DERELICT:
+            print("🛸 Derelict ship detected!")
+            print("Scanning for salvage...")
+            self._trigger_scrap_reward(random.randint(5, 15))
+
+        elif poi.type == POIType.ANOMALY:
+            print("🌀 Strange anomaly detected...")
+            print("Sensors are going crazy!")
+            self._trigger_random_event()
+
+        elif poi.type == POIType.BOSS:
+            print("⚠️  ⚠️  ⚠️  BOSS ENCOUNTER! ⚠️  ⚠️  ⚠️")
+            print("This is it. The Rebel Flagship!")
+            print()
+            self.trigger_encounter(enemy_type="rebel_fighter", forced=True)
+
+        # Callback
+        if self.on_poi_arrival:
+            self.on_poi_arrival(poi)
+
+    def _trigger_scrap_reward(self, amount: int):
+        """Give scrap reward to player"""
+        print(f"✓ Found {amount} scrap!")
+        self.ship.scrap += amount
+        print()
 
     def _trigger_random_event(self):
         """Trigger a random event with choices"""
@@ -321,6 +343,6 @@ class WorldManager:
         self.ship.scrap += event.get("scrap", 0)
         print()
 
-    def get_available_jumps(self):
-        """Get list of nodes available for jumping"""
-        return self.world_map.get_available_jumps()
+    def get_nearby_pois(self, sensor_range: float = 100.0):
+        """Get POIs within sensor range"""
+        return self.galaxy.get_nearby_pois(self.ship.galaxy_distance_from_center, sensor_range)

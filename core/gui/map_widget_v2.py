@@ -74,6 +74,34 @@ class MapWidgetV2:
         self.bg_stars = [(random.randint(0, width), random.randint(0, height),
                          random.randint(1, 2)) for _ in range(50)]
 
+        # Galaxy navigation buttons (for linear galaxy)
+        button_width = 180
+        button_height = 40
+        button_spacing = 10
+        button_y = 60
+        center_x = width // 2
+
+        self.btn_warp_toward_center = pygame.Rect(
+            center_x - button_width - button_spacing // 2,
+            button_y,
+            button_width,
+            button_height
+        )
+
+        self.btn_warp_away_center = pygame.Rect(
+            center_x + button_spacing // 2,
+            button_y,
+            button_width,
+            button_height
+        )
+
+        self.btn_stop = pygame.Rect(
+            center_x - button_width // 2,
+            button_y + button_height + button_spacing,
+            button_width,
+            button_height
+        )
+
     @property
     def node_radius(self):
         """Get scaled node radius based on zoom"""
@@ -136,14 +164,29 @@ class MapWidgetV2:
             self.last_mouse_pos = mouse_pos
             return True
 
-        if not self.world_manager:
+        # Left click on buttons (for linear galaxy mode)
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            # Check if clicking on galaxy navigation buttons
+            if not self.world_manager or not hasattr(self.world_manager, 'world_map'):
+                # Linear galaxy mode - check button clicks
+                if self.btn_warp_toward_center.collidepoint(mouse_pos):
+                    self._handle_warp_toward_center()
+                    return True
+                elif self.btn_warp_away_center.collidepoint(mouse_pos):
+                    self._handle_warp_away_center()
+                    return True
+                elif self.btn_stop.collidepoint(mouse_pos):
+                    self._handle_stop()
+                    return True
+
+        if not self.world_manager or not hasattr(self.world_manager, 'world_map'):
             return False
 
         # Left click on nodes
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             # Check if clicking on a node
             current_node = self.world_manager.world_map.get_current_node()
-            available = self.world_manager.get_available_jumps()
+            available = self.world_manager.get_available_jumps() if hasattr(self.world_manager, 'get_available_jumps') else []
 
             # Check each available node
             for node in available:
@@ -168,6 +211,51 @@ class MapWidgetV2:
 
         return False
 
+    def _handle_warp_toward_center(self):
+        """Handle warp toward galaxy center button click"""
+        if not self.ship_os:
+            return
+
+        command = "warp_to_center"
+        self.log_command("Warping toward galaxy center...")
+
+        exit_code, stdout, stderr = self.ship_os.execute_command(command)
+        if stdout:
+            for line in stdout.strip().split('\n'):
+                self.log_command(line)
+        if stderr:
+            self.log_command(f"ERROR: {stderr.strip()}")
+
+    def _handle_warp_away_center(self):
+        """Handle warp away from galaxy center button click"""
+        if not self.ship_os:
+            return
+
+        command = "warp_from_center"
+        self.log_command("Warping away from galaxy center...")
+
+        exit_code, stdout, stderr = self.ship_os.execute_command(command)
+        if stdout:
+            for line in stdout.strip().split('\n'):
+                self.log_command(line)
+        if stderr:
+            self.log_command(f"ERROR: {stderr.strip()}")
+
+    def _handle_stop(self):
+        """Handle stop button click"""
+        if not self.ship_os:
+            return
+
+        command = "stop"
+        self.log_command("Stopping...")
+
+        exit_code, stdout, stderr = self.ship_os.execute_command(command)
+        if stdout:
+            for line in stdout.strip().split('\n'):
+                self.log_command(line)
+        if stderr:
+            self.log_command(f"ERROR: {stderr.strip()}")
+
     def _get_node_screen_pos(self, node):
         """Get screen position for a node (spiral galaxy layout)"""
         # Use node's actual position from spiral generation
@@ -184,7 +272,7 @@ class MapWidgetV2:
 
     def _get_ship_screen_pos(self):
         """Get screen position for ship based on current node"""
-        if not self.world_manager or not self.ship_os:
+        if not self.world_manager or not self.ship_os or not hasattr(self.world_manager, 'world_map'):
             return None
 
         # Get the current node the ship is at
@@ -198,7 +286,7 @@ class MapWidgetV2:
     def update(self, dt):
         """Update widget state"""
         # Auto-center on current node for spiral galaxy
-        if self.world_manager:
+        if self.world_manager and hasattr(self.world_manager, 'world_map'):
             current = self.world_manager.world_map.get_current_node()
             if current:
                 # Keep current node roughly centered
@@ -227,17 +315,72 @@ class MapWidgetV2:
         for star_x, star_y, star_size in self.bg_stars:
             pygame.draw.circle(self.surface, (100, 100, 120), (star_x, star_y), star_size // 2)
 
-        if not self.world_manager:
-            # No world manager - show placeholder
+        if not self.world_manager or not hasattr(self.world_manager, 'world_map'):
+            # No world manager or using linear galaxy - show linear galaxy interface
             if Theme.FONT_TITLE:
-                text = Theme.FONT_TITLE.render("NO MAP DATA", True, (100, 100, 100))
-                rect = text.get_rect(center=(self.width // 2, self.height // 2))
+                # Title
+                text = Theme.FONT_TITLE.render("GALAXY MAP", True, (100, 200, 255))
+                rect = text.get_rect(center=(self.width // 2, 20))
                 self.surface.blit(text, rect)
+
+                # Draw navigation buttons
+                button_font = pygame.font.SysFont('sans-serif', 16, bold=True)
+
+                # Warp toward center button
+                pygame.draw.rect(self.surface, (50, 100, 200), self.btn_warp_toward_center)
+                pygame.draw.rect(self.surface, (100, 150, 255), self.btn_warp_toward_center, 2)
+                btn_text = button_font.render("→ TOWARD CENTER", True, (255, 255, 255))
+                btn_rect = btn_text.get_rect(center=self.btn_warp_toward_center.center)
+                self.surface.blit(btn_text, btn_rect)
+
+                # Warp away from center button
+                pygame.draw.rect(self.surface, (50, 100, 200), self.btn_warp_away_center)
+                pygame.draw.rect(self.surface, (100, 150, 255), self.btn_warp_away_center, 2)
+                btn_text = button_font.render("← AWAY FROM CENTER", True, (255, 255, 255))
+                btn_rect = btn_text.get_rect(center=self.btn_warp_away_center.center)
+                self.surface.blit(btn_text, btn_rect)
+
+                # Stop button
+                pygame.draw.rect(self.surface, (150, 50, 50), self.btn_stop)
+                pygame.draw.rect(self.surface, (255, 100, 100), self.btn_stop, 2)
+                btn_text = button_font.render("■ STOP", True, (255, 255, 255))
+                btn_rect = btn_text.get_rect(center=self.btn_stop.center)
+                self.surface.blit(btn_text, btn_rect)
+
+                # Show ship info if linear galaxy
+                if self.world_manager and hasattr(self.world_manager, 'galaxy'):
+                    info_font = pygame.font.SysFont('sans-serif', 18, bold=True)
+                    ship_pos = self.world_manager.ship.galaxy_distance_from_center
+                    max_dist = self.world_manager.galaxy.max_distance
+                    velocity = self.world_manager.ship.velocity
+
+                    # Position info
+                    pos_text = f"Position: {ship_pos:.1f} / {max_dist:.1f}"
+                    pos_surf = info_font.render(pos_text, True, (200, 200, 255))
+                    pos_rect = pos_surf.get_rect(center=(self.width // 2, self.height // 2))
+                    self.surface.blit(pos_surf, pos_rect)
+
+                    # Velocity info
+                    vel_dir = "toward center" if velocity < 0 else "away from center" if velocity > 0 else "stopped"
+                    vel_text = f"Velocity: {abs(velocity):.1f} ({vel_dir})"
+                    vel_surf = info_font.render(vel_text, True, (150, 255, 150))
+                    vel_rect = vel_surf.get_rect(center=(self.width // 2, self.height // 2 + 30))
+                    self.surface.blit(vel_surf, vel_rect)
+
+                # Command log
+                if self.command_log:
+                    log_y = self.height - 150
+                    log_font = pygame.font.SysFont('sans-serif', 14)
+                    for msg in self.command_log[-3:]:
+                        log_surf = log_font.render(msg, True, (150, 200, 255))
+                        self.surface.blit(log_surf, (10, log_y))
+                        log_y += 20
+
             return self.surface
 
         # Get current node and available jumps
         current_node = self.world_manager.world_map.get_current_node()
-        available_jumps = set(n.id for n in self.world_manager.get_available_jumps())
+        available_jumps = set(n.id for n in self.world_manager.get_available_jumps()) if hasattr(self.world_manager, 'get_available_jumps') else set()
 
         # Draw title
         title_font = pygame.font.SysFont('sans-serif', 24, bold=True)
@@ -466,7 +609,7 @@ class MapWidgetV2:
         pygame.draw.rect(self.surface, (20, 20, 40), (0, panel_y, self.width, panel_height))
         pygame.draw.rect(self.surface, (255, 153, 0), (0, panel_y, self.width, panel_height), 2)
 
-        if not self.world_manager:
+        if not self.world_manager or not hasattr(self.world_manager, 'world_map'):
             return
 
         # Current location info
@@ -480,7 +623,7 @@ class MapWidgetV2:
             self.surface.blit(location_surf, (10, panel_y + 10))
 
         # Available jumps count
-        available = self.world_manager.get_available_jumps()
+        available = self.world_manager.get_available_jumps() if hasattr(self.world_manager, 'get_available_jumps') else []
         if available:
             jumps_text = f"Available jumps: {len(available)}"
             jumps_font = pygame.font.SysFont('sans-serif', 12)

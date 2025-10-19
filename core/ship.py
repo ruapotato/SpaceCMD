@@ -16,9 +16,8 @@ class SystemType(Enum):
     SHIELDS = "shields"
     WEAPONS = "weapons"
     ENGINES = "engines"
-    OXYGEN = "oxygen"
     REACTOR = "reactor"
-    MEDBAY = "medbay"
+    REPAIR_BAY = "repair_bay"
     SENSORS = "sensors"
     DOORS = "doors"
     TELEPORTER = "teleporter"
@@ -60,7 +59,6 @@ class Room:
         self.health = 1.0  # 0.0 to 1.0
 
         # Room conditions
-        self.oxygen_level = 1.0  # 0.0 to 1.0
         self.on_fire = False
         self.breached = False
         self.venting = False  # Doors open to space
@@ -68,11 +66,14 @@ class Room:
         # Crew in this room
         self.crew: List['Crew'] = []
 
-        # Connected rooms (for pathfinding and oxygen flow)
+        # Connected rooms (for pathfinding)
         self.connections: List['Room'] = []
 
         # System-specific data
         self.system_data = {}
+
+        # Reference to parent ship (set when added to ship)
+        self.ship: Optional['Ship'] = None
 
     @property
     def state(self) -> RoomState:
@@ -81,8 +82,6 @@ class Room:
             return RoomState.BREACHED
         if self.on_fire:
             return RoomState.ON_FIRE
-        if self.oxygen_level < 0.2:
-            return RoomState.NO_OXYGEN
         if self.health < 0.3:
             return RoomState.CRITICAL
         if self.health < 0.7:
@@ -91,10 +90,43 @@ class Room:
 
     @property
     def is_functional(self) -> bool:
-        """Can this room's system operate?"""
-        return (self.health > 0.2 and  # Systems work until they're severely damaged (< 20%)
-                self.power_allocated > 0 and
-                not self.breached)  # Systems work without crew, but poorly
+        """
+        Can this room's system operate?
+
+        CRITICAL OS-LEVEL CHECK:
+        - Systems need power allocated
+        - Ship must have enough TOTAL power from reactor
+        - If reactor damaged: available power drops, systems fail!
+        """
+        if self.health <= 0.2:  # Systems work until severely damaged (< 20%)
+            return False
+        if self.breached:  # Breached systems don't work
+            return False
+        if self.power_allocated <= 0:  # Need power
+            return False
+
+        # CRITICAL: Check if ship has enough power from reactor!
+        # If reactor is damaged, total power drops, systems start failing
+        if self.ship:
+            total_power_needed = sum(r.power_allocated for r in self.ship.rooms.values())
+            available_power = self.ship.get_available_power()
+
+            # If ship is over-budget on power, systems fail!
+            # Higher priority systems (lower in list) fail first
+            if total_power_needed > available_power:
+                # Calculate power deficit
+                power_deficit = total_power_needed - available_power
+
+                # This system only works if we haven't exceeded budget
+                # Systems fail in priority order (weapons/engines fail first when reactor damaged)
+                accumulated_power = 0
+                for room_name, room in self.ship.rooms.items():
+                    accumulated_power += room.power_allocated
+                    if room == self:
+                        # This is our room - check if we're within budget
+                        return accumulated_power <= available_power
+
+        return True
 
     @property
     def crew_bonus(self) -> float:
@@ -120,8 +152,17 @@ class Room:
             room.connections.append(self)
 
     def take_damage(self, amount: float):
-        """Deal damage to this room's system"""
+        """
+        Deal damage to this room's system.
+        Crew/robots in the room also take damage!
+        """
         self.health = max(0.0, self.health - amount)
+
+        # CREW/ROBOTS TAKE DAMAGE when room is damaged!
+        # Each point of system damage = 5 HP damage to crew
+        crew_damage = amount * 5.0
+        for crew in self.crew:
+            crew.take_damage(crew_damage)
 
     def repair(self, amount: float):
         """Repair this room's system"""
@@ -158,9 +199,18 @@ class ShipSystem:
         How effective is this system? (0.0 to 1.0+)
         Affected by power, health, and crew.
 
+        CREW BONUSES (what each system does with crew):
+        - SHIELDS: Crew → Faster shield recharge (10% per skill level)
+        - WEAPONS: Crew → Faster weapon charge (10% per skill level)
+        - ENGINES: Crew → Faster ship speed (10% per skill level)
+        - REACTOR: Crew → +1 power per crew member (see get_available_power())
+        - REPAIR_BAY: Crew → Faster repair/healing (effectiveness affects repair rate)
+        - HELM: Crew → Better evasion (effectiveness affects dodge chance)
+
+        Base formula:
         - Without crew: 25% base effectiveness (automated systems)
         - With 1+ crew: 100% effectiveness + crew bonuses
-        - Crew skills provide additional bonuses
+        - Crew skills provide additional bonuses (10% per skill level)
         """
         if not self.is_online():
             return 0.0
@@ -211,10 +261,19 @@ class Ship:
         self.shields_max = 0
         self.evasion = 0
 
-        # Galaxy position and movement
-        self.galaxy_distance_from_center = 400.0  # Distance from galaxy center
-        self.speed = 1.0  # Ship speed (affects chase mechanics)
-        self.max_speed = 2.0  # Maximum speed
+        # Galaxy position and movement (1D linear galaxy)
+        self.galaxy_position = 800.0  # Current position (distance from center, 0 = center)
+        self.velocity = 0.0  # Current velocity (positive = away from center, negative = toward center)
+        self.target_position = None  # Target position to travel to (None = not traveling)
+        self.is_traveling = False  # Whether actively traveling
+        self.base_speed = 0.8  # Base travel speed without engines (units per second) - 20 min to cross galaxy
+        self.max_speed = 1.5  # Maximum travel speed with engines+crew (units per second) - 11 min to cross galaxy
+        # With engines but NO crew (25% effectiveness): 0.975 u/s - 17 min to cross galaxy
+        # CREW IN ENGINES IS CRITICAL for fast travel!
+
+        # Legacy compatibility (remove eventually)
+        self.galaxy_distance_from_center = self.galaxy_position  # Deprecated
+        self.speed = 1.0  # Deprecated
 
         # Ship template (ASCII art)
         self.template = None
@@ -222,6 +281,7 @@ class Ship:
     def add_room(self, room: Room):
         """Add a room to the ship"""
         self.rooms[room.name] = room
+        room.ship = self  # Give room reference to ship
 
         # Register system
         if room.system_type != SystemType.NONE:
@@ -245,6 +305,35 @@ class Ship:
     def add_weapon(self, weapon: 'Weapon'):
         """Add a weapon to the ship"""
         self.weapons.append(weapon)
+
+    def get_available_power(self) -> int:
+        """
+        Get available power considering reactor health and crew bonus.
+
+        CRITICAL MECHANIC: Reactor damage reduces power output!
+        - 100% health = 100% power
+        - 50% health = 50% power
+        - Damaged reactor disables weapons and engines!
+
+        Returns:
+            Total available power (base * reactor_health + crew bonus)
+        """
+        base_power = self.reactor_power
+
+        # REACTOR DAMAGE REDUCES POWER OUTPUT (OS-level mechanic!)
+        if SystemType.REACTOR in self.systems:
+            reactor_system = self.systems[SystemType.REACTOR]
+            if reactor_system.room:
+                # Reactor health directly affects power output
+                reactor_health = reactor_system.room.health
+                base_power = int(base_power * reactor_health)
+
+                # Reactor crew bonus: +1 power per crew member in reactor room
+                if reactor_system.room.crew:
+                    crew_count = len(reactor_system.room.crew)
+                    base_power += crew_count  # Each crew adds 1 power!
+
+        return base_power
 
     def allocate_power(self, system_type: SystemType, power: int):
         """Allocate power to a system"""
@@ -298,9 +387,97 @@ class Ship:
                 room = self.rooms[target_room]
                 room.take_damage(0.2 * damage)  # System damage
 
+    def get_current_speed(self) -> float:
+        """
+        Calculate current ship speed based on engine effectiveness.
+        More power + more crew in engines = faster!
+
+        Returns:
+            Current speed in units per second
+        """
+        # Base speed without engines
+        speed = self.base_speed
+
+        # Engines boost speed significantly
+        if SystemType.ENGINES in self.systems:
+            engine_system = self.systems[SystemType.ENGINES]
+            engine_effectiveness = engine_system.get_effectiveness()
+
+            # Engines can double speed when fully powered and crewed
+            # 0% effectiveness = base_speed (50)
+            # 100% effectiveness = max_speed (200)
+            speed_boost = engine_effectiveness * (self.max_speed - self.base_speed)
+            speed += speed_boost
+
+        return speed
+
+    def set_course(self, target_position: float):
+        """
+        Set course to a target position.
+        Ship will travel toward this position until it arrives.
+
+        Args:
+            target_position: Target position in galaxy
+        """
+        self.target_position = target_position
+        self.is_traveling = True
+
+        # Calculate current speed (depends on engines!)
+        current_speed = self.get_current_speed()
+
+        # Set velocity based on direction
+        if target_position < self.galaxy_position:
+            # Traveling toward center (negative velocity)
+            self.velocity = -current_speed
+        else:
+            # Traveling away from center (positive velocity)
+            self.velocity = current_speed
+
+    def stop_traveling(self):
+        """Stop traveling (emergency stop or arrival)"""
+        self.is_traveling = False
+        self.velocity = 0.0
+        self.target_position = None
+
+    def update_position(self, dt: float):
+        """
+        Update ship's position based on velocity.
+        Called every frame to handle continuous movement.
+
+        Args:
+            dt: Delta time in seconds
+        """
+        if not self.is_traveling or self.target_position is None:
+            return
+
+        # Move ship
+        distance_to_move = self.velocity * dt
+        new_position = self.galaxy_position + distance_to_move
+
+        # Check if we've arrived at target
+        if self.velocity > 0:  # Moving away from center
+            if new_position >= self.target_position:
+                # Arrived!
+                self.galaxy_position = self.target_position
+                self.stop_traveling()
+                return
+        else:  # Moving toward center
+            if new_position <= self.target_position:
+                # Arrived!
+                self.galaxy_position = self.target_position
+                self.stop_traveling()
+                return
+
+        # Continue moving
+        self.galaxy_position = new_position
+
+        # Update legacy field
+        self.galaxy_distance_from_center = self.galaxy_position
+
     def update(self, dt: float):
         """
         Update ship state each game tick.
+        - Update position (continuous movement)
         - Update all systems
         - Update weapons
         - Update oxygen levels
@@ -308,6 +485,9 @@ class Ship:
         - Check crew status
         - Autonomous crew actions (repair, fight fires, etc.)
         """
+        # Update position (continuous galaxy travel)
+        self.update_position(dt)
+
         # Update all systems
         for system in self.systems.values():
             system.update(dt)
@@ -319,9 +499,6 @@ class Ship:
 
         # Autonomous crew actions (AI bots manage themselves!)
         self._update_crew_ai(dt)
-
-        # Update oxygen (spreads between connected rooms)
-        self._update_oxygen(dt)
 
         # Update fires
         self._update_fires(dt)
@@ -357,51 +534,27 @@ class Ship:
 
             # Priority 2: Repair damaged systems
             if crew.room.health < 1.0:
-                crew.repair_system(dt * 3.0)  # 3x faster repair for bots!
+                # Very slow repairs - 1/100th of base rate (much more realistic)
+                crew.repair_system(dt * 0.01)
                 continue
 
-            # Priority 3: Heal in medbay if injured
+            # Priority 3: Heal in repair bay if injured
             if crew.health < crew.health_max * 0.8:  # Below 80% health
-                # Try to go to medbay
-                medbay_room = None
+                # Try to go to repair bay
+                repair_bay_room = None
                 for room in self.rooms.values():
-                    if room.system_type == SystemType.MEDBAY and room.is_functional:
-                        medbay_room = room
+                    if room.system_type == SystemType.REPAIR_BAY and room.is_functional:
+                        repair_bay_room = room
                         break
 
-                if medbay_room and crew.room == medbay_room:
-                    # Heal in medbay (it repairs bots!)
+                if repair_bay_room and crew.room == repair_bay_room:
+                    # Heal in repair bay (it repairs bots!)
                     heal_rate = 10.0  # 10 HP per second
                     crew.heal(dt * heal_rate)
 
             # Priority 4: Just operate their system (already in room)
             # Crew just being present in room provides bonuses
 
-    def _update_oxygen(self, dt: float):
-        """Update oxygen levels in all rooms"""
-        if SystemType.OXYGEN not in self.systems:
-            return
-
-        o2_system = self.systems[SystemType.OXYGEN]
-
-        for room in self.rooms.values():
-            # Breached rooms lose oxygen
-            if room.breached or room.venting:
-                room.oxygen_level = max(0.0, room.oxygen_level - dt * 0.5)
-
-            # O2 system replenishes oxygen
-            elif o2_system.is_online():
-                room.oxygen_level = min(1.0, room.oxygen_level + dt * 0.2 * o2_system.get_effectiveness())
-
-            # Crew consume oxygen
-            if room.crew:
-                consumption = len(room.crew) * dt * 0.05
-                room.oxygen_level = max(0.0, room.oxygen_level - consumption)
-
-            # Damage crew in low oxygen
-            if room.oxygen_level < 0.3:
-                for crew in room.crew:
-                    crew.take_damage(dt * 0.1)
 
     def _update_fires(self, dt: float):
         """Update fire spread and damage"""
@@ -413,21 +566,13 @@ class Ship:
                 for crew in room.crew:
                     crew.take_damage(dt * 0.2)
 
-                # Fire consumes oxygen
-                room.oxygen_level = max(0.0, room.oxygen_level - dt * 0.3)
-
                 # Fire spreads to connected rooms (small chance)
-                if room.oxygen_level > 0.2:  # Needs oxygen to spread
-                    for connected in room.connections:
-                        if not connected.on_fire and connected.oxygen_level > 0.5:
-                            # 1% chance per second to spread
-                            import random
-                            if random.random() < dt * 0.01:
-                                connected.on_fire = True
-
-                # Fire dies in vacuum
-                if room.oxygen_level < 0.1:
-                    room.on_fire = False
+                for connected in room.connections:
+                    if not connected.on_fire:
+                        # 1% chance per second to spread
+                        import random
+                        if random.random() < dt * 0.01:
+                            connected.on_fire = True
 
     def get_power_usage(self) -> Dict[str, int]:
         """Get current power allocation by system"""
@@ -451,7 +596,6 @@ class Ship:
             'rooms': {name: {
                 'health': room.health,
                 'power': room.power_allocated,
-                'oxygen': room.oxygen_level,
                 'on_fire': room.on_fire,
                 'breached': room.breached,
             } for name, room in self.rooms.items()},
@@ -513,13 +657,23 @@ class Crew:
         self.health = min(self.health_max, self.health + amount)
 
     def repair_system(self, dt: float):
-        """Repair the system in current room"""
+        """
+        Repair the system in current room.
+
+        IMPORTANT: Robots repair SLOWER than humans!
+        - Humans: Fast repairs (100% rate)
+        - Robots: Slow repairs (50% rate)
+        """
         if not self.room or self.room.health >= 1.0:
             return
 
-        # Repair speed based on skill (bots repair fast!)
+        # Base repair rate
         repair_skill = self.skills.repair
-        repair_rate = 0.2 * (1 + repair_skill * 0.5)  # Base 20% per second (2x faster than before)
+        repair_rate = 0.2 * (1 + repair_skill * 0.5)  # Base 20% per second
+
+        # ROBOTS REPAIR SLOWER (50% rate)
+        if self.race == "robot":
+            repair_rate *= 0.5
 
         self.room.repair(dt * repair_rate)
 

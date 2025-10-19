@@ -73,24 +73,19 @@ class SystemMonitor:
                     elif 'Allocated:' in line:
                         self.power_used = int(line.split(':')[1].strip())
 
-            # Read location from /proc/ship/sensors (requires sensors to be functional)
+            # Read location from /proc/ship/sensors
             exit_code, stdout, stderr = self.ship_os.execute_command("cat /proc/ship/sensors")
             if exit_code == 0 and stdout:
-                if "SENSORS OFFLINE" not in stdout:
-                    # Sensors are online, extract location
-                    self.location_available = True
-                    for line in stdout.split('\n'):
-                        if 'Galaxy Position:' in line:
-                            # Extract distance value
-                            parts = line.split(':')
-                            if len(parts) > 1:
-                                distance_str = parts[1].strip().split()[0]
-                                self.location = f"{float(distance_str):.0f}u"
-                            break
-                else:
-                    # Sensors offline
-                    self.location_available = False
-                    self.location = "OFFLINE"
+                # Extract position from sensors
+                self.location_available = True
+                for line in stdout.split('\n'):
+                    if 'Position:' in line and 'units from' in line:
+                        # Extract distance value (e.g. "Position: 1000.0 units from galactic center")
+                        parts = line.split(':')
+                        if len(parts) > 1:
+                            distance_str = parts[1].strip().split()[0]
+                            self.location = f"{float(distance_str):.0f}u from center"
+                        break
 
             # Get max values from ship object if available
             if hasattr(self.ship_os, 'ship'):
@@ -165,6 +160,10 @@ class SystemMonitor:
 
         location_surface = Theme.FONT_UI.render(location_text, True, location_color)
         surface.blit(location_surface, (current_x, y + 8))
+        current_x += location_surface.get_width() + 16
+
+        # Crew assignments and bonuses
+        self._render_crew_bonuses(surface, current_x, y)
 
     def _get_health_color(self, current, maximum):
         """Get color based on health percentage"""
@@ -191,6 +190,58 @@ class SystemMonitor:
 
         # Border
         pygame.draw.rect(surface, (80, 80, 80), (x, y, width, height), 1)
+
+    def _render_crew_bonuses(self, surface, x, y):
+        """Render crew assignment bonuses"""
+        if not Theme.FONT_UI or not hasattr(self.ship_os, 'ship'):
+            return
+
+        ship = self.ship_os.ship
+
+        # Count crew in each system and calculate bonuses
+        from ..ship import SystemType
+
+        # Get crew counts per system
+        crew_counts = {}
+        for room in ship.rooms.values():
+            if room.system_type != SystemType.NONE and room.crew:
+                system_name = room.system_type.value
+                crew_counts[system_name] = len(room.crew)
+
+        # Render crew assignments (compact format)
+        bonus_text_parts = []
+
+        # Engines crew and speed bonus
+        if 'engines' in crew_counts:
+            engine_crew = crew_counts['engines']
+            current_speed = ship.get_current_speed()
+            # Show speed boost from engines
+            bonus_text_parts.append(f"CREW×{engine_crew} ENG → SPD:{current_speed:.1f}u/s")
+
+        # Reactor crew and power bonus
+        if 'reactor' in crew_counts:
+            reactor_crew = crew_counts['reactor']
+            # Reactor crew adds 1 power each
+            bonus_text_parts.append(f"CREW×{reactor_crew} PWR → +{reactor_crew}⚡")
+
+        # Weapons crew
+        if 'weapons' in crew_counts:
+            weapon_crew = crew_counts['weapons']
+            bonus_text_parts.append(f"CREW×{weapon_crew} WPN")
+
+        # Shields crew
+        if 'shields' in crew_counts:
+            shield_crew = crew_counts['shields']
+            bonus_text_parts.append(f"CREW×{shield_crew} SHD")
+
+        # Render all bonus text
+        if bonus_text_parts:
+            bonus_color = (255, 204, 153)  # Orange
+            for i, text in enumerate(bonus_text_parts):
+                bonus_surface = Theme.FONT_UI.render(text, True, bonus_color)
+                # Render in a compact horizontal layout
+                surface.blit(bonus_surface, (x, y + 8))
+                x += bonus_surface.get_width() + 8
 
 
 class TopBar:

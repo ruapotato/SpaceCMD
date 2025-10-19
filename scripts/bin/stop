@@ -1,0 +1,36 @@
+#!/usr/bin/pooscript
+# stop - Stop ship movement / emergency stop
+
+# Check current status
+try:
+    fd = kernel.open("/proc/ship/sensors", kernel.O_RDONLY)
+    sensor_data = kernel.read(fd, 4096).decode('utf-8')
+    kernel.close(fd)
+
+    # Parse velocity
+    velocity = 0.0
+    for line in sensor_data.split('\n'):
+        if "Velocity:" in line:
+            try:
+                velocity = float(line.split(':')[1].strip().split()[0])
+            except:
+                pass
+
+    if abs(velocity) < 0.01:
+        print("Ship is already stopped")
+        exit(0)
+except Exception as e:
+    error(f"Failed to read sensors: {e}")
+    exit(1)
+
+# Stop the ship by writing to stop device
+try:
+    fd = kernel.open("/dev/ship/stop", kernel.O_WRONLY)
+    kernel.write(fd, b"1")
+    kernel.close(fd)
+
+    print("✓ Emergency stop activated")
+    print("  Ship is now stationary")
+except Exception as e:
+    error(f"Failed to stop ship: {e}")
+    exit(1)

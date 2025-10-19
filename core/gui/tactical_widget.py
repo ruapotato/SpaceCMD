@@ -31,7 +31,6 @@ class ShipRoom:
         self.width = width  # In grid units
         self.height = height
         self.health = 100
-        self.oxygen = 100
         self.on_fire = False
         self.breached = False
         self.crew = []  # List of crew member names in this room
@@ -71,8 +70,8 @@ class ShipLayout:
 
         # Row 1
         self.rooms.append(ShipRoom("Engines", "engines", 0, 1, 1, 1))
-        self.rooms.append(ShipRoom("Medbay", "medbay", 1, 1, 1, 1))
-        self.rooms.append(ShipRoom("Oxygen", "oxygen", 2, 1, 1, 1))
+        self.rooms.append(ShipRoom("Repair Bay", "repair_bay", 1, 1, 1, 1))
+        self.rooms.append(ShipRoom("Sensors", "sensors", 2, 1, 1, 1))
         self.rooms.append(ShipRoom("Reactor", "reactor", 3, 1, 1, 1))
 
         # Add some crew
@@ -104,8 +103,10 @@ class ShipLayout:
 
 
 class Projectile:
-    """Weapon projectile animation"""
-    def __init__(self, x, y, target_x, target_y, ptype="laser"):
+    """Weapon projectile animation with source/target tracking"""
+    def __init__(self, x, y, target_x, target_y, ptype="laser", is_enemy=False, source_room=None, target_room=None):
+        self.start_x = x  # Store origin for visual effects
+        self.start_y = y
         self.x = x
         self.y = y
         self.target_x = target_x
@@ -113,6 +114,11 @@ class Projectile:
         self.type = ptype
         self.speed = 300  # pixels per second
         self.alive = True
+        self.is_enemy = is_enemy  # True if fired by enemy, False if fired by player
+        self.source_room = source_room  # Room name where shot originated
+        self.target_room = target_room  # Room name being targeted
+        self.impact_effect_time = 0.3  # Show impact effect for 0.3 seconds after hit
+        self.has_hit = False
 
     def update(self, dt):
         """Update projectile position"""
@@ -122,7 +128,10 @@ class Projectile:
         dist = (dx**2 + dy**2) ** 0.5
 
         if dist < 5:
-            self.alive = False
+            self.has_hit = True
+            self.impact_effect_time -= dt
+            if self.impact_effect_time <= 0:
+                self.alive = False
             return
 
         # Normalize and move
@@ -182,6 +191,11 @@ class TacticalWidget:
         self.weapon_buttons = []  # Weapon fire buttons
         self.beacon_button = None  # Beacon control button
         self.beacon_active = False  # Beacon state
+
+        # Navigation buttons (galaxy map controls)
+        self.nav_btn_warp_toward = None
+        self.nav_btn_warp_away = None
+        self.nav_btn_stop = None
 
         # Reference to world manager (set externally)
         self.world_manager = None
@@ -265,16 +279,63 @@ class TacticalWidget:
         self.enemy_ship = None
         self.show_enemy = False
 
-    def fire_weapon(self, weapon_type="laser"):
+    def fire_weapon(self, weapon_type="laser", target_room_name=None):
         """Animate weapon fire from player to enemy"""
         if self.enemy_ship:
-            # Fire from player weapon room to enemy
+            # Find player weapon room position
+            weapon_room_x = self.player_x + 200  # Approximate weapons room
+            weapon_room_y = self.player_y + 60
+
+            # Find target room position if specified
+            target_x = self.enemy_x + 50
+            target_y = self.enemy_y + 60
+            if target_room_name:
+                for room in self.enemy_ship.rooms:
+                    if room.name == target_room_name:
+                        target_x = self.enemy_x + (room.x + room.width / 2) * self.room_size
+                        target_y = self.enemy_y + 40 + (room.y + room.height / 2) * self.room_size
+                        break
+
+            # Create projectile with source and target info
             proj = Projectile(
-                self.player_x + 200,
-                self.player_y + 60,
-                self.enemy_x + 50,
-                self.enemy_y + 60,
-                weapon_type
+                weapon_room_x,
+                weapon_room_y,
+                target_x,
+                target_y,
+                weapon_type,
+                is_enemy=False,
+                source_room="Weapons",
+                target_room=target_room_name
+            )
+            self.projectiles.append(proj)
+
+    def fire_enemy_weapon(self, weapon_type="laser", target_room_name=None):
+        """Animate weapon fire from enemy to player"""
+        if self.enemy_ship and self.player_ship:
+            # Find enemy weapon room position
+            enemy_weapon_room_x = self.enemy_x + 50
+            enemy_weapon_room_y = self.enemy_y + 60
+
+            # Find target room position if specified
+            target_x = self.player_x + 120
+            target_y = self.player_y + 60
+            if target_room_name:
+                for room in self.player_ship.rooms:
+                    if room.name == target_room_name:
+                        target_x = self.player_x + (room.x + room.width / 2) * self.room_size
+                        target_y = self.player_y + 40 + (room.y + room.height / 2) * self.room_size
+                        break
+
+            # Create enemy projectile
+            proj = Projectile(
+                enemy_weapon_room_x,
+                enemy_weapon_room_y,
+                target_x,
+                target_y,
+                weapon_type,
+                is_enemy=True,
+                source_room="Enemy Weapons",
+                target_room=target_room_name
             )
             self.projectiles.append(proj)
 
@@ -290,12 +351,56 @@ class TacticalWidget:
         for proj in self.projectiles:
             proj.update(dt)
 
-    def _render_ship(self, surface, ship, offset_x, offset_y, is_enemy=False):
-        """Render a single ship's interior with improved visuals"""
+        # Update star positions based on ship velocity (warp effect!)
+        # Stars move whenever ship has velocity, not just during warp travel
+        if self.world_manager and hasattr(self.world_manager, 'ship_os'):
+            ship = self.world_manager.ship_os.ship
+            # Check velocity instead of is_traveling - stars move during chase too!
+            if abs(ship.velocity) > 0.1:
+                # Move stars to create motion effect
+                # Velocity is in galaxy units/sec, scale it for visual effect
+                star_speed = ship.velocity * 20  # Scale for visual effect
+
+                # Move each star
+                new_stars = []
+                for star_x, star_y, star_size in self.bg_stars:
+                    # Move star based on velocity (stars move opposite to ship direction)
+                    new_x = star_x + star_speed * dt
+
+                    # Wrap stars around screen edges
+                    if new_x < 0:
+                        new_x += self.width
+                    elif new_x > self.width:
+                        new_x -= self.width
+
+                    new_stars.append((new_x, star_y, star_size))
+
+                self.bg_stars = new_stars
+
+    def _render_ship(self, surface, ship, offset_x, offset_y, is_enemy=False, alpha=1.0):
+        """Render a single ship's interior with improved visuals
+
+        Args:
+            surface: Surface to render on
+            ship: Ship to render
+            offset_x: X offset for rendering
+            offset_y: Y offset for rendering
+            is_enemy: Whether this is an enemy ship
+            alpha: Opacity (0.0 = invisible, 1.0 = fully visible) for fading
+        """
         # Ship color theme
         ship_color = (220, 60, 60) if is_enemy else (60, 220, 120)
         accent_color = (255, 100, 100) if is_enemy else (100, 255, 150)
         glow_color = (255, 150, 150) if is_enemy else (150, 255, 200)
+
+        # If alpha < 1.0, we need to render to a temporary surface first
+        if alpha < 1.0:
+            # Create temporary surface for alpha blending
+            temp_surface = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+            temp_surface.fill((0, 0, 0, 0))  # Transparent background
+            render_target = temp_surface
+        else:
+            render_target = surface
 
         # Clear enemy room rects if rendering enemy
         if is_enemy:
@@ -330,6 +435,14 @@ class TacticalWidget:
             title_font = pygame.font.SysFont('sans-serif', 20, bold=True)
             title = title_font.render(ship.ship_name, True, accent_color)
             surface.blit(title, (offset_x, offset_y - 35))
+
+            # Show galaxy position if available
+            if hasattr(ship, 'galaxy_position'):
+                pos_font = pygame.font.SysFont('sans-serif', 14, bold=True)
+                pos_text = f"Position: {ship.galaxy_position:.1f} from center"
+                pos_color = (150, 200, 255) if not is_enemy else (255, 150, 150)
+                pos_surface = pos_font.render(pos_text, True, pos_color)
+                surface.blit(pos_surface, (offset_x, offset_y - 15))
 
         # Hull/Shields bars - moved higher and made bigger
         if Theme.FONT_SMALL:
@@ -375,6 +488,26 @@ class TacticalWidget:
             # Text with bigger font
             shield_text = stats_font.render(f"{ship.shields}/{ship.max_shields}", True, (255, 255, 255))
             surface.blit(shield_text, (shield_bar_x + bar_width + 5, bar_y))
+
+            # Galaxy position info
+            bar_y += 22  # More spacing
+            pos_font = pygame.font.SysFont('sans-serif', 14, bold=True)
+
+            # Get galaxy position
+            if hasattr(ship, 'galaxy_position'):
+                galaxy_pos = ship.galaxy_position
+                pos_label = pos_font.render(f"POS: {galaxy_pos:.1f} from center", True, (150, 200, 255))
+                surface.blit(pos_label, (offset_x, bar_y))
+
+                # If in combat, show enemy range
+                if not is_enemy and self.world_manager and self.world_manager.combat_state:
+                    combat_state = self.world_manager.combat_state
+                    enemy_pos = combat_state.enemy_galaxy_position
+                    range_distance = abs(galaxy_pos - enemy_pos)
+
+                    bar_y += 16
+                    range_label = pos_font.render(f"ENEMY RANGE: {range_distance:.1f} units", True, (255, 200, 100))
+                    surface.blit(range_label, (offset_x, bar_y))
 
         # Render rooms
         for room in ship.rooms:
@@ -567,23 +700,174 @@ class TacticalWidget:
                     surface.blit(breach_text, (room_x + 5, room_y + room_h // 2 + 15))
 
     def _render_projectiles(self, surface):
-        """Render weapon projectiles"""
+        """Render weapon projectiles with source and impact indicators"""
         for proj in self.projectiles:
-            if proj.type == "laser":
-                # Red laser beam
-                pygame.draw.circle(surface, (255, 50, 50), (int(proj.x), int(proj.y)), 3)
-                # Trail
-                trail_x = proj.x - 10
-                pygame.draw.line(
-                    surface,
-                    (255, 100, 100),
-                    (trail_x, proj.y),
-                    (proj.x, proj.y),
-                    2
-                )
-            elif proj.type == "missile":
-                # Yellow missile
-                pygame.draw.circle(surface, (255, 200, 0), (int(proj.x), int(proj.y)), 4)
+            # Determine projectile color based on who fired it
+            if proj.is_enemy:
+                # Enemy shots are orange/red
+                proj_color = (255, 100, 50)
+                trail_color = (255, 150, 100)
+            else:
+                # Player shots are blue/cyan
+                proj_color = (50, 150, 255)
+                trail_color = (100, 200, 255)
+
+            if proj.has_hit:
+                # Show impact effect
+                import time
+                pulse = abs((time.time() * 10) % 2 - 1)  # Fast pulse
+                impact_radius = int(8 + pulse * 8)  # 8-16 pixels
+                impact_alpha = int((1.0 - pulse) * 200)  # Fade out
+
+                # Draw expanding impact circle
+                impact_surf = pygame.Surface((impact_radius*2, impact_radius*2), pygame.SRCALPHA)
+                pygame.draw.circle(impact_surf, (*proj_color, impact_alpha),
+                                 (impact_radius, impact_radius), impact_radius)
+                surface.blit(impact_surf, (int(proj.target_x - impact_radius),
+                                          int(proj.target_y - impact_radius)))
+
+                # Draw flash at impact point
+                flash_color = (255, 255, 255)
+                pygame.draw.circle(surface, flash_color, (int(proj.target_x), int(proj.target_y)),
+                                 int(4 * (1.0 - pulse)))
+            else:
+                # Draw source indicator (small glow at origin)
+                source_glow_radius = 6
+                source_surf = pygame.Surface((source_glow_radius*2, source_glow_radius*2), pygame.SRCALPHA)
+                pygame.draw.circle(source_surf, (*proj_color, 100),
+                                 (source_glow_radius, source_glow_radius), source_glow_radius)
+                surface.blit(source_surf, (int(proj.start_x - source_glow_radius),
+                                          int(proj.start_y - source_glow_radius)))
+
+                # Draw target indicator (pulsing reticle at target)
+                import time
+                pulse = abs((time.time() * 3) % 2 - 1)  # Pulse effect
+                reticle_size = int(8 + pulse * 4)
+                reticle_alpha = int(100 + pulse * 100)
+
+                # Draw crosshair at target
+                reticle_surf = pygame.Surface((reticle_size*2, reticle_size*2), pygame.SRCALPHA)
+                # Vertical line
+                pygame.draw.line(reticle_surf, (*proj_color, reticle_alpha),
+                               (reticle_size, reticle_size - reticle_size//2),
+                               (reticle_size, reticle_size + reticle_size//2), 2)
+                # Horizontal line
+                pygame.draw.line(reticle_surf, (*proj_color, reticle_alpha),
+                               (reticle_size - reticle_size//2, reticle_size),
+                               (reticle_size + reticle_size//2, reticle_size), 2)
+                # Circle
+                pygame.draw.circle(reticle_surf, (*proj_color, reticle_alpha),
+                                 (reticle_size, reticle_size), reticle_size//2, 2)
+                surface.blit(reticle_surf, (int(proj.target_x - reticle_size),
+                                           int(proj.target_y - reticle_size)))
+
+                # Draw projectile
+                if proj.type == "laser":
+                    # Laser beam
+                    pygame.draw.circle(surface, proj_color, (int(proj.x), int(proj.y)), 4)
+                    # Trail
+                    trail_length = 20
+                    dx = proj.target_x - proj.start_x
+                    dy = proj.target_y - proj.start_y
+                    dist = (dx**2 + dy**2) ** 0.5
+                    if dist > 0:
+                        dx /= dist
+                        dy /= dist
+                        trail_start_x = proj.x - dx * trail_length
+                        trail_start_y = proj.y - dy * trail_length
+                        pygame.draw.line(
+                            surface,
+                            trail_color,
+                            (trail_start_x, trail_start_y),
+                            (proj.x, proj.y),
+                            3
+                        )
+                    # Core glow
+                    glow_surf = pygame.Surface((12, 12), pygame.SRCALPHA)
+                    pygame.draw.circle(glow_surf, (*proj_color, 150), (6, 6), 6)
+                    surface.blit(glow_surf, (int(proj.x - 6), int(proj.y - 6)))
+
+                elif proj.type == "missile":
+                    # Missile with exhaust trail
+                    pygame.draw.circle(surface, (255, 200, 0), (int(proj.x), int(proj.y)), 5)
+                    # Exhaust
+                    dx = proj.target_x - proj.start_x
+                    dy = proj.target_y - proj.start_y
+                    dist = (dx**2 + dy**2) ** 0.5
+                    if dist > 0:
+                        dx /= dist
+                        dy /= dist
+                        for i in range(3):
+                            trail_x = proj.x - dx * (i * 8)
+                            trail_y = proj.y - dy * (i * 8)
+                            alpha = 200 - i * 60
+                            exhaust_surf = pygame.Surface((8, 8), pygame.SRCALPHA)
+                            pygame.draw.circle(exhaust_surf, (255, 150, 50, alpha), (4, 4), 4 - i)
+                            surface.blit(exhaust_surf, (int(trail_x - 4), int(trail_y - 4)))
+
+    def _render_distance_indicator(self, surface, combat_state):
+        """Render distance indicator - shows galaxy distance or weapon range"""
+        center_x = (self.player_x + 200 + self.enemy_x) // 2
+        center_y = 80
+
+        # Calculate galaxy distance
+        galaxy_distance = abs(combat_state.player_galaxy_position - combat_state.enemy_galaxy_position)
+
+        if not combat_state.active:
+            # Not engaged - show galaxy distance to enemy
+            panel_width = 280
+            panel_height = 70
+            panel_x = center_x - panel_width // 2
+            panel_y = center_y - panel_height // 2
+
+            pygame.draw.rect(surface, (20, 20, 40), (panel_x, panel_y, panel_width, panel_height), border_radius=8)
+            pygame.draw.rect(surface, (255, 153, 0), (panel_x, panel_y, panel_width, panel_height), 3, border_radius=8)
+
+            if Theme.FONT_SMALL:
+                title_font = pygame.font.SysFont('sans-serif', 16, bold=True)
+                title = title_font.render("ENEMY DISTANCE", True, (255, 153, 0))
+                title_rect = title.get_rect(center=(center_x, panel_y + 15))
+                surface.blit(title, title_rect)
+
+                dist_font = pygame.font.SysFont('sans-serif', 20, bold=True)
+                if galaxy_distance >= combat_state.sensor_range:
+                    dist_color = (100, 255, 100)  # Green - escaped!
+                    dist_text = f"{galaxy_distance:.1f}u - ESCAPED!"
+                elif galaxy_distance > combat_state.engagement_range:
+                    dist_color = (255, 200, 100)  # Orange - can warp away
+                    dist_text = f"{galaxy_distance:.1f}u - Use warp to escape"
+                else:
+                    dist_color = (255, 100, 100)  # Red - will engage
+                    dist_text = f"{galaxy_distance:.1f}u - ENGAGING!"
+
+                dist_surface = dist_font.render(dist_text, True, dist_color)
+                dist_rect = dist_surface.get_rect(center=(center_x, panel_y + 45))
+                surface.blit(dist_surface, dist_rect)
+        else:
+            # Active combat - show weapon range
+            combat_distance = combat_state.combat_distance
+
+            panel_width = 220
+            panel_height = 60
+            panel_x = center_x - panel_width // 2
+            panel_y = center_y - panel_height // 2
+
+            pygame.draw.rect(surface, (20, 20, 40), (panel_x, panel_y, panel_width, panel_height), border_radius=8)
+            pygame.draw.rect(surface, (255, 153, 0), (panel_x, panel_y, panel_width, panel_height), 3, border_radius=8)
+
+            if Theme.FONT_SMALL:
+                title_font = pygame.font.SysFont('sans-serif', 14, bold=True)
+                title = title_font.render("WEAPON RANGE", True, (255, 153, 0))
+                title_rect = title.get_rect(center=(center_x, panel_y + 12))
+                surface.blit(title, title_rect)
+
+                dist_font = pygame.font.SysFont('sans-serif', 22, bold=True)
+                dist_text = f"{combat_distance:.1f} units"
+                dist_color = (100, 255, 150)
+
+                dist_surface = dist_font.render(dist_text, True, dist_color)
+                dist_rect = dist_surface.get_rect(center=(center_x, panel_y + 38))
+                surface.blit(dist_surface, dist_rect)
 
     def handle_event(self, event, mouse_pos):
         """
@@ -613,6 +897,22 @@ class TacticalWidget:
                     if self.beacon_active:
                         self.log_command("⚠️  WARNING: Will attract enemies!")
 
+                return True
+
+            # Check navigation buttons
+            if self.nav_btn_warp_toward and self.nav_btn_warp_toward.collidepoint(mouse_pos):
+                play_sound("click", 0.3)
+                self._execute_nav_command("warp_to_center", "Warping toward center...")
+                return True
+
+            if self.nav_btn_warp_away and self.nav_btn_warp_away.collidepoint(mouse_pos):
+                play_sound("click", 0.3)
+                self._execute_nav_command("warp_from_center", "Warping away from center...")
+                return True
+
+            if self.nav_btn_stop and self.nav_btn_stop.collidepoint(mouse_pos):
+                play_sound("click", 0.3)
+                self._execute_nav_command("stop", "Emergency stop...")
                 return True
 
             # Check if clicking weapon buttons (combat controls)
@@ -698,7 +998,23 @@ class TacticalWidget:
         if weapon_index < len(combat_state.player_ship.weapons):
             weapon = combat_state.player_ship.weapons[weapon_index]
             if weapon.is_ready():
-                self.fire_weapon(weapon.weapon_type if hasattr(weapon, 'weapon_type') else "laser")
+                # Fire weapon with target room info for animation
+                self.fire_weapon(
+                    weapon.weapon_type if hasattr(weapon, 'weapon_type') else "laser",
+                    self.selected_target_room
+                )
+
+    def _execute_nav_command(self, command, message):
+        """Execute a navigation command"""
+        self.log_command(message)
+        if self.ship_os:
+            exit_code, stdout, stderr = self.ship_os.execute_command(command)
+            if stdout:
+                for line in stdout.strip().split('\n'):
+                    self.log_command(line)
+            if stderr:
+                for line in stderr.strip().split('\n'):
+                    self.log_command(f"ERROR: {line}")
 
     def render(self):
         """
@@ -721,10 +1037,13 @@ class TacticalWidget:
         for star_x, star_y, star_size in self.bg_stars:
             brightness = random.randint(150, 255)
             star_color = (brightness, brightness, brightness)
+            # Convert to integers for pygame
+            star_x_int = int(star_x)
+            star_y_int = int(star_y)
             if star_size == 1:
-                self.surface.set_at((star_x, star_y), star_color)
+                self.surface.set_at((star_x_int, star_y_int), star_color)
             else:
-                pygame.draw.circle(self.surface, star_color, (star_x, star_y), star_size // 2)
+                pygame.draw.circle(self.surface, star_color, (star_x_int, star_y_int), star_size // 2)
 
         # Calculate main display area (leaving room for command log)
         main_height = self.height - self.command_log_height
@@ -743,7 +1062,27 @@ class TacticalWidget:
 
         # Render enemy ship if present
         if self.show_enemy and self.enemy_ship:
-            self._render_ship(self.surface, self.enemy_ship, self.enemy_x, self.enemy_y + 40, True)
+            # Calculate enemy fade based on distance
+            enemy_alpha = 1.0
+            if self.world_manager and self.world_manager.combat_state:
+                combat_state = self.world_manager.combat_state
+                # Calculate galaxy distance
+                distance = abs(combat_state.player_galaxy_position - combat_state.enemy_galaxy_position)
+                sensor_range = combat_state.sensor_range
+
+                # Fade enemy as they approach sensor range
+                # Start fading at 70% of sensor range (21 units for 30 unit range)
+                fade_start = sensor_range * 0.7
+                if distance > fade_start:
+                    # Linear fade from 1.0 to 0.0 as distance goes from fade_start to sensor_range
+                    fade_amount = (distance - fade_start) / (sensor_range - fade_start)
+                    enemy_alpha = max(0.0, 1.0 - fade_amount)
+
+            self._render_ship(self.surface, self.enemy_ship, self.enemy_x, self.enemy_y + 40, True, alpha=enemy_alpha)
+
+            # Render distance indicator (between ships)
+            if self.world_manager and self.world_manager.combat_state:
+                self._render_distance_indicator(self.surface, self.world_manager.combat_state)
 
         # Render projectiles
         self._render_projectiles(self.surface)
@@ -762,11 +1101,17 @@ class TacticalWidget:
         # Border
         pygame.draw.rect(surface, (255, 153, 0), log_rect, 2)
 
-        # Beacon button (always visible) - top right corner
-        beacon_button_width = 150
-        beacon_button_height = 30
+        # Navigation buttons (galaxy map controls) - top right area
+        nav_button_width = 140
+        nav_button_height = 28
+        nav_button_spacing = 5
+        nav_start_x = self.width - nav_button_width - 10
+
+        # Beacon button (always visible) - above nav buttons
+        beacon_button_width = 140
+        beacon_button_height = 28
         self.beacon_button = pygame.Rect(
-            self.width - beacon_button_width - 10,
+            nav_start_x,
             y_start + 5,
             beacon_button_width,
             beacon_button_height
@@ -778,11 +1123,59 @@ class TacticalWidget:
         pygame.draw.rect(surface, (255, 153, 0), self.beacon_button, 2, border_radius=4)
 
         if Theme.FONT_SMALL:
-            beacon_font = pygame.font.SysFont('sans-serif', 16, bold=True)
+            beacon_font = pygame.font.SysFont('sans-serif', 14, bold=True)
             beacon_text = "📡 BEACON: ON" if self.beacon_active else "📡 BEACON: OFF"
             beacon_surface = beacon_font.render(beacon_text, True, (255, 255, 255))
             text_rect = beacon_surface.get_rect(center=self.beacon_button.center)
             surface.blit(beacon_surface, text_rect)
+
+        # Navigation buttons
+        nav_y = y_start + 5 + beacon_button_height + nav_button_spacing
+
+        # Warp toward center button
+        self.nav_btn_warp_toward = pygame.Rect(
+            nav_start_x,
+            nav_y,
+            nav_button_width,
+            nav_button_height
+        )
+        pygame.draw.rect(surface, (50, 100, 200), self.nav_btn_warp_toward, border_radius=4)
+        pygame.draw.rect(surface, (100, 150, 255), self.nav_btn_warp_toward, 2, border_radius=4)
+        if Theme.FONT_SMALL:
+            nav_font = pygame.font.SysFont('sans-serif', 12, bold=True)
+            nav_text = nav_font.render("→ TOWARD CENTER", True, (255, 255, 255))
+            text_rect = nav_text.get_rect(center=self.nav_btn_warp_toward.center)
+            surface.blit(nav_text, text_rect)
+
+        # Warp away from center button
+        nav_y += nav_button_height + nav_button_spacing
+        self.nav_btn_warp_away = pygame.Rect(
+            nav_start_x,
+            nav_y,
+            nav_button_width,
+            nav_button_height
+        )
+        pygame.draw.rect(surface, (50, 100, 200), self.nav_btn_warp_away, border_radius=4)
+        pygame.draw.rect(surface, (100, 150, 255), self.nav_btn_warp_away, 2, border_radius=4)
+        if Theme.FONT_SMALL:
+            nav_text = nav_font.render("← AWAY FROM CENTER", True, (255, 255, 255))
+            text_rect = nav_text.get_rect(center=self.nav_btn_warp_away.center)
+            surface.blit(nav_text, text_rect)
+
+        # Stop button
+        nav_y += nav_button_height + nav_button_spacing
+        self.nav_btn_stop = pygame.Rect(
+            nav_start_x,
+            nav_y,
+            nav_button_width,
+            nav_button_height
+        )
+        pygame.draw.rect(surface, (150, 50, 50), self.nav_btn_stop, border_radius=4)
+        pygame.draw.rect(surface, (255, 100, 100), self.nav_btn_stop, 2, border_radius=4)
+        if Theme.FONT_SMALL:
+            nav_text = nav_font.render("■ STOP", True, (255, 255, 255))
+            text_rect = nav_text.get_rect(center=self.nav_btn_stop.center)
+            surface.blit(nav_text, text_rect)
 
         # Left side: Weapon controls (if in combat)
         weapons_width = self.width // 2
@@ -840,26 +1233,45 @@ class TacticalWidget:
 
                     button_y += 32
 
-        # Right side: Command log
+        # Right side: Command log (ensure it doesn't overlap navigation buttons)
         log_x = weapons_width + 8
+        # Calculate max width for log text to avoid nav buttons
+        nav_button_start = self.width - 150  # Nav buttons start at width - 140 - 10
+        max_log_width = nav_button_start - log_x - 10  # Leave 10px gap
+
         if Theme.FONT_SMALL:
             title = Theme.FONT_SMALL.render("COMBAT LOG", True, (255, 153, 0))
             surface.blit(title, (log_x, y_start + 4))
 
-        # Render command lines
+        # Render command lines (truncate if too long to avoid overlap)
         if Theme.FONT_TERMINAL:
             line_y = y_start + 22
             for cmd in self.command_log[-5:]:  # Only last 5 lines
-                cmd_surface = Theme.FONT_TERMINAL.render(cmd, True, (100, 255, 150))
+                # Truncate command if it would overlap with nav buttons
+                truncated_cmd = cmd
+                cmd_surface = Theme.FONT_TERMINAL.render(truncated_cmd, True, (100, 255, 150))
+
+                # If text is too wide, truncate it
+                while cmd_surface.get_width() > max_log_width and len(truncated_cmd) > 0:
+                    truncated_cmd = truncated_cmd[:-4] + "..."
+                    cmd_surface = Theme.FONT_TERMINAL.render(truncated_cmd, True, (100, 255, 150))
+
                 surface.blit(cmd_surface, (log_x, line_y))
                 line_y += 18
 
         # Hint text if no commands
         if not self.command_log and Theme.FONT_SMALL:
             if self.world_manager and self.world_manager.is_in_combat():
-                hint = Theme.FONT_SMALL.render("Click enemy rooms to target, click weapons to fire", True, (100, 100, 100))
+                hint_text = "Click enemy rooms to target, click weapons to fire"
             else:
-                hint = Theme.FONT_SMALL.render("Click crew to select, click rooms to move crew", True, (100, 100, 100))
+                hint_text = "Click crew to select, click rooms to move crew"
+
+            # Truncate hint if needed
+            hint = Theme.FONT_SMALL.render(hint_text, True, (100, 100, 100))
+            while hint.get_width() > max_log_width and len(hint_text) > 0:
+                hint_text = hint_text[:-4] + "..."
+                hint = Theme.FONT_SMALL.render(hint_text, True, (100, 100, 100))
+
             surface.blit(hint, (log_x, y_start + 50))
 
     def update_player_ship(self, ship_data):
@@ -889,7 +1301,6 @@ class TacticalWidget:
                 # Update conditions
                 display_room.on_fire = real_room.on_fire
                 display_room.breached = real_room.breached
-                display_room.oxygen = int(real_room.oxygen_level * 100)
 
         # Update crew positions from real ship
         # First clear all crew from rooms

@@ -34,9 +34,9 @@ def create_kestrel() -> Ship:
     shields.max_power = 3
     ship.add_room(shields)
 
-    oxygen = Room("Oxygen", SystemType.OXYGEN, x=2, y=0)
-    oxygen.max_power = 1
-    ship.add_room(oxygen)
+    repair_bay = Room("Repair Bay", SystemType.REPAIR_BAY, x=2, y=0)
+    repair_bay.max_power = 2
+    ship.add_room(repair_bay)
 
     # Middle row
     weapons = Room("Weapons", SystemType.WEAPONS, x=0, y=1)
@@ -47,9 +47,9 @@ def create_kestrel() -> Ship:
     corridor.max_power = 0
     ship.add_room(corridor)
 
-    medbay = Room("Medbay", SystemType.MEDBAY, x=2, y=1)
-    medbay.max_power = 2
-    ship.add_room(medbay)
+    sensors = Room("Sensors", SystemType.SENSORS, x=2, y=1)
+    sensors.max_power = 2
+    ship.add_room(sensors)
 
     # Bottom row
     reactor = Room("Reactor", SystemType.REACTOR, x=0, y=2)
@@ -60,39 +60,38 @@ def create_kestrel() -> Ship:
     engines.max_power = 3
     ship.add_room(engines)
 
-    sensors = Room("Sensors", SystemType.SENSORS, x=2, y=2)
-    sensors.max_power = 2
-    ship.add_room(sensors)
+    storage = Room("Storage", SystemType.NONE, x=2, y=2)
+    storage.max_power = 0
+    ship.add_room(storage)
 
-    # Connect rooms (for crew pathfinding and oxygen flow)
+    # Connect rooms (for crew pathfinding)
     helm.connect_to(shields)
-    shields.connect_to(oxygen)
+    shields.connect_to(repair_bay)
     helm.connect_to(weapons)
     shields.connect_to(corridor)
-    oxygen.connect_to(medbay)
+    repair_bay.connect_to(sensors)
     weapons.connect_to(corridor)
-    corridor.connect_to(medbay)
+    corridor.connect_to(sensors)
     weapons.connect_to(reactor)
     corridor.connect_to(engines)
-    medbay.connect_to(sensors)
+    sensors.connect_to(storage)
     reactor.connect_to(engines)
-    engines.connect_to(sensors)
+    engines.connect_to(storage)
 
     # Add systems
     ship.add_system(ShipSystem("Helm Control", SystemType.HELM), "Helm")
     ship.add_system(ShipSystem("Shield Generator", SystemType.SHIELDS), "Shields")
-    ship.add_system(ShipSystem("Oxygen System", SystemType.OXYGEN), "Oxygen")
+    ship.add_system(ShipSystem("Repair Bay", SystemType.REPAIR_BAY), "Repair Bay")
     ship.add_system(ShipSystem("Weapon Control", SystemType.WEAPONS), "Weapons")
-    ship.add_system(ShipSystem("Medbay", SystemType.MEDBAY), "Medbay")
     ship.add_system(ShipSystem("Reactor Core", SystemType.REACTOR), "Reactor")
     ship.add_system(ShipSystem("Engine Room", SystemType.ENGINES), "Engines")
     ship.add_system(ShipSystem("Sensor Array", SystemType.SENSORS), "Sensors")
 
     # Initial power allocation
     ship.allocate_power(SystemType.SHIELDS, 2)
-    ship.allocate_power(SystemType.OXYGEN, 1)
     ship.allocate_power(SystemType.ENGINES, 2)
     ship.allocate_power(SystemType.WEAPONS, 2)
+    ship.allocate_power(SystemType.SENSORS, 2)  # Sensors need power to show location
 
     # Set shields
     ship.shields_max = 4
@@ -162,8 +161,9 @@ def create_stealth_cruiser() -> Ship:
     reactor = Room("Reactor", SystemType.REACTOR, x=0, y=2)
     ship.add_room(reactor)
 
-    oxygen = Room("Oxygen", SystemType.OXYGEN, x=1, y=2)
-    ship.add_room(oxygen)
+    repair_bay = Room("Repair Bay", SystemType.REPAIR_BAY, x=1, y=2)
+    repair_bay.max_power = 1
+    ship.add_room(repair_bay)
 
     # Connections
     helm.connect_to(cloaking)
@@ -171,8 +171,8 @@ def create_stealth_cruiser() -> Ship:
     cloaking.connect_to(engines)
     weapons.connect_to(engines)
     weapons.connect_to(reactor)
-    engines.connect_to(oxygen)
-    reactor.connect_to(oxygen)
+    engines.connect_to(repair_bay)
+    reactor.connect_to(repair_bay)
 
     # Systems
     ship.add_system(ShipSystem("Helm", SystemType.HELM), "Helm")
@@ -180,12 +180,12 @@ def create_stealth_cruiser() -> Ship:
     ship.add_system(ShipSystem("Weapons", SystemType.WEAPONS), "Weapons")
     ship.add_system(ShipSystem("Engines", SystemType.ENGINES), "Engines")
     ship.add_system(ShipSystem("Reactor", SystemType.REACTOR), "Reactor")
-    ship.add_system(ShipSystem("Oxygen", SystemType.OXYGEN), "Oxygen")
+    ship.add_system(ShipSystem("Repair Bay", SystemType.REPAIR_BAY), "Repair Bay")
 
     # Initial power
-    ship.allocate_power(SystemType.OXYGEN, 1)
     ship.allocate_power(SystemType.ENGINES, 3)
     ship.allocate_power(SystemType.WEAPONS, 2)
+    ship.allocate_power(SystemType.REPAIR_BAY, 1)
 
     # Crew
     pilot = Crew("Ghost", "human")
@@ -232,8 +232,9 @@ def create_mantis_cruiser() -> Ship:
     teleporter.max_power = 3
     ship.add_room(teleporter)
 
-    oxygen = Room("Oxygen", SystemType.OXYGEN, x=2, y=1)
-    ship.add_room(oxygen)
+    sensors = Room("Sensors", SystemType.SENSORS, x=2, y=1)
+    sensors.max_power = 2
+    ship.add_room(sensors)
 
     reactor = Room("Reactor", SystemType.REACTOR, x=0, y=2)
     ship.add_room(reactor)
@@ -242,38 +243,38 @@ def create_mantis_cruiser() -> Ship:
     engines.max_power = 2
     ship.add_room(engines)
 
-    medbay = Room("Medbay", SystemType.MEDBAY, x=2, y=2)
-    medbay.max_power = 2
-    ship.add_room(medbay)
+    repair_bay = Room("Repair Bay", SystemType.REPAIR_BAY, x=2, y=2)
+    repair_bay.max_power = 2
+    ship.add_room(repair_bay)
 
     # Connections
     helm.connect_to(shields)
     helm.connect_to(weapons)
     shields.connect_to(teleporter)
     weapons.connect_to(teleporter)
-    teleporter.connect_to(oxygen)
+    teleporter.connect_to(sensors)
     weapons.connect_to(reactor)
     teleporter.connect_to(engines)
-    oxygen.connect_to(medbay)
+    sensors.connect_to(repair_bay)
     reactor.connect_to(engines)
-    engines.connect_to(medbay)
+    engines.connect_to(repair_bay)
 
     # Systems
     ship.add_system(ShipSystem("Helm", SystemType.HELM), "Helm")
     ship.add_system(ShipSystem("Shields", SystemType.SHIELDS), "Shields")
     ship.add_system(ShipSystem("Weapons", SystemType.WEAPONS), "Weapons")
     ship.add_system(ShipSystem("Teleporter", SystemType.TELEPORTER), "Teleporter")
-    ship.add_system(ShipSystem("Oxygen", SystemType.OXYGEN), "Oxygen")
+    ship.add_system(ShipSystem("Sensors", SystemType.SENSORS), "Sensors")
     ship.add_system(ShipSystem("Reactor", SystemType.REACTOR), "Reactor")
     ship.add_system(ShipSystem("Engines", SystemType.ENGINES), "Engines")
-    ship.add_system(ShipSystem("Medbay", SystemType.MEDBAY), "Medbay")
+    ship.add_system(ShipSystem("Repair Bay", SystemType.REPAIR_BAY), "Repair Bay")
 
     # Initial power
     ship.allocate_power(SystemType.SHIELDS, 2)
-    ship.allocate_power(SystemType.OXYGEN, 1)
     ship.allocate_power(SystemType.ENGINES, 1)
     ship.allocate_power(SystemType.WEAPONS, 2)
     ship.allocate_power(SystemType.TELEPORTER, 1)
+    ship.allocate_power(SystemType.SENSORS, 1)
 
     ship.shields_max = 2
     ship.shields = 2

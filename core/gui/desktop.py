@@ -402,10 +402,7 @@ class Desktop:
                         # Ctrl+D: Tactical display
                         self.create_tactical_window()
                         continue
-                    elif event.key == pygame.K_m:
-                        # Ctrl+M: Galaxy map
-                        self.create_map_window()
-                        continue
+                    # Ctrl+M: Galaxy map - REMOVED
                     elif event.key == pygame.K_i:
                         # Ctrl+I: Ship info
                         self.create_ship_info_window()
@@ -440,9 +437,7 @@ class Desktop:
                         self.create_ship_info_window()
                     elif item_index == 4:  # Tactical Display
                         self.create_tactical_window()
-                    elif item_index == 5:  # Galaxy Map
-                        self.create_map_window()
-                    elif item_index == 7:  # Quit (after separator)
+                    elif item_index == 6:  # Quit (after separator)
                         self.running = False
 
                     self.menu_open = False
@@ -511,6 +506,18 @@ class Desktop:
                 self.warp_speed = self.base_warp_speed
                 print("   ✓ Jump complete. Arrived at destination.\n")
 
+        # Update warp speed based on ship velocity (if available)
+        if self.ship_os and hasattr(self.ship_os, 'ship'):
+            ship = self.ship_os.ship
+            # Check for ANY velocity (traveling or chase), not just is_traveling
+            if abs(ship.velocity) > 0.1:
+                # Scale ship velocity for visual effect
+                # Ship velocity is in galaxy units/sec, scale for star effect
+                self.warp_speed = abs(ship.velocity) * 3.0  # Scale for visual drama
+            elif not self.jump_animation_active:
+                # No active movement and no jump animation - stars should be stationary!
+                self.warp_speed = 0.0  # FIXED: Was base_warp_speed (0.5), now 0
+
         # Update starfield
         for star in self.stars:
             star.update(self.warp_speed)
@@ -544,12 +551,10 @@ class Desktop:
 
         # Handle maximize state
         for window in self.windows:
-            if window.state == WindowState.MAXIMIZED and window.saved_rect:
+            if window.state == WindowState.MAXIMIZED:
                 # Account for both top bar and taskbar
-                available_height = self.height - Theme.TASKBAR_HEIGHT
-                if self.topbar:
-                    available_height -= self.topbar.height
-                window.maximize(self.width, available_height, Theme.TASKBAR_HEIGHT)
+                topbar_height = self.topbar.height if self.topbar else 0
+                window.maximize(self.width, self.height, Theme.TASKBAR_HEIGHT, topbar_height)
 
         # Decay attack flash
         if self.attack_flash > 0:
@@ -610,7 +615,6 @@ class Desktop:
             "Text Editor",
             "Ship Info",
             "Tactical Display",
-            "Galaxy Map",
             "---",
             "Quit"
         ]
