@@ -270,6 +270,9 @@ class TerminalWidget:
                     self.input_line[self.cursor_pos:]
                 )
                 self.cursor_pos += 1
+                # Force cursor to be visible when typing
+                self.cursor_visible = True
+                self.cursor_blink_time = 0
                 return True
 
         # Scroll wheel
@@ -363,7 +366,7 @@ class TerminalWidget:
         prompt_surface = Theme.FONT_TERMINAL.render(self.prompt, True, (100, 255, 150))
         self.surface.blit(prompt_surface, (4, input_y))
 
-        # Input text - ALWAYS render, even if empty
+        # Input text - ALWAYS render
         prompt_width = prompt_surface.get_width()
 
         # Calculate how much space we have for input
@@ -371,8 +374,11 @@ class TerminalWidget:
         visible_chars = max(1, max_input_width // self.char_width) if self.char_width > 0 else 40
 
         # Determine what portion of input to show
-        if len(self.input_line) > 0:
-            # If cursor is beyond visible area, scroll the input
+        cursor_offset = self.cursor_pos
+        visible_input = self.input_line
+
+        if len(self.input_line) > visible_chars:
+            # Input is too long, need to scroll
             if self.cursor_pos >= visible_chars:
                 # Show the portion around the cursor
                 start_pos = max(0, self.cursor_pos - visible_chars + 1)
@@ -383,19 +389,20 @@ class TerminalWidget:
                 visible_input = self.input_line[:visible_chars]
                 cursor_offset = self.cursor_pos
 
-            # Render the visible input
-            if visible_input:
-                input_surface = Theme.FONT_TERMINAL.render(visible_input, True, TERMINAL_FG)
-                self.surface.blit(input_surface, (4 + prompt_width, input_y))
-        else:
-            cursor_offset = 0
+        # ALWAYS render the input text (even if empty string)
+        input_surface = Theme.FONT_TERMINAL.render(visible_input, True, TERMINAL_FG)
+        self.surface.blit(input_surface, (4 + prompt_width, input_y))
 
-        # Cursor - ALWAYS draw it
+        # Cursor - ALWAYS draw it (make it block style for better visibility)
+        cursor_x = 4 + prompt_width + cursor_offset * self.char_width
         if self.cursor_visible:
-            cursor_x = 4 + prompt_width + cursor_offset * self.char_width
-            # Make cursor more visible
-            cursor_rect = pygame.Rect(cursor_x, input_y, max(2, self.char_width // 2), self.char_height)
+            # Block cursor
+            cursor_rect = pygame.Rect(cursor_x, input_y, max(self.char_width, 8), self.char_height)
             pygame.draw.rect(self.surface, TERMINAL_CURSOR, cursor_rect)
+        else:
+            # Draw a thin line even when "blinking off" so you know where you are
+            cursor_rect = pygame.Rect(cursor_x, input_y, 2, self.char_height)
+            pygame.draw.rect(self.surface, (0, 150, 50), cursor_rect)
 
         return self.surface
 

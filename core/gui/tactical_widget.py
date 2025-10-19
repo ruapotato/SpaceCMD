@@ -183,12 +183,45 @@ class TacticalWidget:
         if len(self.command_log) > self.max_log_lines:
             self.command_log = self.command_log[-self.max_log_lines:]
 
-    def move_crew(self, crew_name, target_room):
+    def move_crew(self, crew_name, target_room_name):
         """Move a crew member to a target room"""
         # Log the action
-        self.log_command(f"crew move {crew_name} {target_room}")
-        # TODO: Actually move the crew in the ship layout
-        # For now, just log it
+        self.log_command(f"crew move {crew_name} to {target_room_name}")
+
+        # Find which room the crew is currently in
+        current_room = None
+        for room in self.player_ship.rooms:
+            if crew_name in room.crew:
+                current_room = room
+                break
+
+        # Find the target room
+        target_room = None
+        for room in self.player_ship.rooms:
+            if room.name == target_room_name:
+                target_room = room
+                break
+
+        # Move the crew
+        if current_room and target_room and current_room != target_room:
+            # Remove from current room
+            current_room.crew.remove(crew_name)
+            # Add to target room
+            target_room.crew.append(crew_name)
+
+            # Update crew_positions list
+            for i, (x, y, name) in enumerate(self.player_ship.crew_positions):
+                if name == crew_name:
+                    self.player_ship.crew_positions[i] = (target_room.x, target_room.y, name)
+                    break
+
+            self.log_command(f"✓ {crew_name} moved to {target_room_name}")
+        elif not current_room:
+            self.log_command(f"✗ Error: {crew_name} not found")
+        elif not target_room:
+            self.log_command(f"✗ Error: {target_room_name} not found")
+        else:
+            self.log_command(f"✗ {crew_name} already in {target_room_name}")
 
     def set_enemy_ship(self, enemy_layout):
         """Set enemy ship to display"""
@@ -291,11 +324,23 @@ class TacticalWidget:
 
             # Fill color based on status
             bg_color = (20, 20, 40)
+
+            # Highlight room if crew is selected (to show it's clickable)
+            if self.selected_crew and not is_enemy:
+                bg_color = (30, 30, 50)  # Slightly brighter
+
             pygame.draw.rect(surface, bg_color, room_rect)
 
             # Border color based on health
             border_color = room.get_status_color()
-            pygame.draw.rect(surface, border_color, room_rect, 2)
+
+            # Extra bright border if this is a target room (when crew is selected)
+            border_width = 2
+            if self.selected_crew and not is_enemy:
+                border_color = (100, 255, 150)  # Green highlight for targetable rooms
+                border_width = 3
+
+            pygame.draw.rect(surface, border_color, room_rect, border_width)
 
             # System icon/name
             if room.system_type and Theme.FONT_SMALL:
