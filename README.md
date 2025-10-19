@@ -1,107 +1,252 @@
-# SpaceCMD - Hackable Spaceship Operating System
+# SpaceCMD - Hackable Spaceship Combat Roguelike
 
-A terminal-based spaceship command simulator powered by **ShipOS** - a complete Unix-like operating system where **everything is a file** and **everything is hackable**.
+A terminal-based spaceship combat game where **every ship runs a Unix-like operating system** and **all AI is implemented in PoohScript** - a real scripting language you can read, hack, steal, and exploit.
 
 ```
 ╔═══════════════════════════════════════════════════════════════╗
 ║                      KESTREL SHIP OS                          ║
 ║                   HUMAN CRUISER CLASS                         ║
+║              ALL SYSTEMS RUNNING POOHSCRIPT                   ║
 ╚═══════════════════════════════════════════════════════════════╝
 ```
 
 ## 🚀 What is SpaceCMD?
 
-SpaceCMD is an FTL-inspired spaceship simulator where you control your ship through a **real scripting language** (PooScript). Every command is a script you can read, modify, and hack. The entire ship is mounted as device files in `/dev`, `/proc`, and `/sys`.
+**SpaceCMD is the world's first roguelike where enemies are controlled by REAL scripts you can hack.**
+
+Every spaceship in the game runs a complete Unix-like operating system (ShipOS). Enemy AI isn't hard-coded in Python - it's **actual PoohScript files** running in `/usr/bin/` on enemy ship computers. You can:
+
+- **Hack into enemy ships** and read their automation scripts
+- **Disable their weapon control** by removing scripts from `/etc/cron/jobs`
+- **Steal their AI** and run it on your own ship
+- **Modify their config files** to change behavior
+- **Plant backdoors** to control multiple ships
+
+**IMPORTANT:** This game is built on PoohScript - NOT hard-coded Python game logic. All intelligence, automation, and behaviors are PoohScript files running on virtual Unix systems. This is a core design principle.
 
 ### Key Features
 
-- **Full Unix-like OS**: Shell, VFS, processes, permissions, kernel syscalls
-- **PooScript Language**: Python-like scripting language for ship control
-- **Everything is Hackable**: All commands are PooScript files you can modify
+- **Full Unix-like OS**: Every ship runs ShipOS with shell, VFS, processes, permissions
+- **PoohScript AI**: ALL game logic is PoohScript - enemy AI, automation, everything
+- **Hackable Enemy Ships**: Enemy AI runs as actual scripts in `/usr/bin/` you can steal/disable
+- **No Hard-coded Python**: Game behavior is defined by PoohScript files, not Python code
 - **Device File Interface**: Ship systems exposed as `/dev`, `/proc`, `/sys` files
-- **Autonomous Crew Bots**: AI-controlled crew that manage repairs and emergencies
-- **Beautiful Terminal UI**: LCARS-style interface with animated starfield
-- **Real Kernel Syscalls**: Use `kernel.open()`, `kernel.read()`, `kernel.write()`
+- **Autonomous Crew Bots**: PoohScript-based crew AI that manage repairs
+- **Beautiful Terminal UI**: LCARS-style 3-panel interface showing ship interiors
+- **Real Hacking**: Infiltrate enemy filesystems, disable scripts, steal automation
 
 ## 🎮 Quick Start
 
 ```bash
-# Install (no dependencies beyond Python 3)
+# Install
 git clone https://github.com/ruapotato/SpaceCMD.git
 cd SpaceCMD
 
-# Launch the game
+# Install pygame (required for GUI mode)
+pip install pygame
+
+# Launch GUI mode (default - recommended!)
 python3 play.py
 
-# Or choose a specific ship
+# Or use CLI mode (for debugging)
+python3 play.py --no-gui
+
+# Choose a specific ship
 python3 play.py --ship kestrel
 ```
 
-## 📁 The Ship Filesystem
+### 🖥️ GUI Desktop Environment (NEW!)
 
-Everything in your ship is accessible as a file:
+SpaceCMD now features a beautiful Pygame-based desktop environment:
 
+- **LCARS + GNOME 2 Aesthetic**: Star Trek inspired interface with professional window management
+- **Multiple Terminals**: Open multiple terminal windows, all connected to the same ShipOS
+- **Tactical Display**: FTL-style ship interior view with interactive crew management
+- **Real Unix Integration**: Every terminal runs actual ShipOS commands (`ls`, `pwd`, `cat`, `touch`, etc.)
+- **Animated Starfield**: Dynamic background with warp effects
+- **Interactive Crew**: Click crew members to select them, click rooms to move them
+- **Command Log**: See what commands are being executed in real-time
+
+**Keyboard Shortcuts:**
+- `Ctrl+T` - Open new terminal
+- `Ctrl+D` - Open tactical display
+- `ESC` - Exit
+
+See [GUI_README.md](GUI_README.md) for detailed GUI documentation.
+
+## 📁 The Ship Filesystem (Unix-like)
+
+Every ship runs a complete Unix-like filesystem:
+
+### Your Ship (Player)
 ```
-/dev/ship/           - Hardware devices
-  ├── hull           - Read hull integrity
-  ├── shields        - Read shield strength
-  ├── reactor        - Read reactor power
-  └── fuel           - Read fuel level
-
 /proc/ship/          - Ship state (like /proc in Linux)
-  ├── status         - Complete ship status
-  ├── power          - Power allocation info
-  └── crew_ai        - Autonomous crew bot status
+  ├── name           - Ship name
+  ├── hull           - Current hull points
+  ├── shields        - Current shield layers
+  ├── power          - Available power
+  └── scrap          - Currency/resources
 
-/sys/ship/           - Ship subsystems (like /sys in Linux)
-  ├── systems/       - Individual ship systems
-  │   ├── engines/
-  │   ├── weapons/
-  │   ├── shields/
-  │   └── ...
-  ├── crew/          - Crew bot status (read-only)
-  └── rooms/         - Room status (oxygen, fire, etc)
+/proc/systems/       - System status
+  ├── weapons        - Weapon status, charge, power
+  ├── shields        - Shield layers, power
+  ├── engines        - Engine power, evasion
+  ├── oxygen         - O2 levels
+  └── medbay         - Medical bay status
+
+/proc/crew/          - Crew member status
+  ├── bot1           - Crew bot 1 stats
+  ├── bot2           - Crew bot 2 stats
+  └── bot3           - Crew bot 3 stats
+
+/usr/local/bin/      - YOUR automation scripts (write your own!)
+  ├── auto_repair    - Your repair automation
+  └── combat_ai      - Your combat AI (PoohScript!)
+
+/etc/cron/jobs       - Scripts that run automatically
 ```
 
-## 🤖 Autonomous Crew Bots
-
-Your crew are **autonomous AI bots** that manage themselves:
-
-- ✅ **Automatically repair** damaged systems
-- ✅ **Fight fires** in rooms
-- ✅ **Monitor oxygen** levels
-- ✅ **Operate systems** efficiently
-- ✅ **No manual assignment** needed!
-
-View crew bot activity:
-```bash
-crew                      # Show what each bot is doing
-cat /proc/ship/crew_ai    # View raw AI status
+### Enemy Ships (Hackable!)
+```
+/proc/ship/          - Enemy ship state
+/proc/systems/       - Enemy system status
+/proc/enemy/         - Enemy's view of YOU (your hull, shields)
+/usr/bin/            - ENEMY AI SCRIPTS (PoohScript!)
+  ├── weapon_control - Their weapon AI
+  ├── shield_manager - Their shield AI
+  ├── damage_control - Their repair AI
+  └── tactical_ai    - Their tactical AI
+/etc/ship/config     - Enemy configuration
+/etc/cron/jobs       - Enemy automation schedule
 ```
 
-Crew bots make intelligent decisions based on ship conditions. You focus on **tactics and power management**, they handle the details!
+**You can hack into enemy ships and steal/disable these scripts!**
 
-## 🛠️ Basic Commands
+## 🎯 Game Goals & Modes
 
+### Easy Mode: Command-Line Combat
+- Fight through 8 sectors using terminal commands
+- Learn ship systems and basic combat
+- Use pre-written commands (all PoohScript!)
+- **Goal:** Reach Federation HQ with vital intel
+
+### Normal Mode: Hacking & Exploitation
+- Enemy AI is smarter (better PoohScript)
+- You must hack enemy ships to gain advantage
+- Disable their automation scripts
+- Steal their AI for your own use
+- **Goal:** Survive by superior hacking skills
+
+### Hard Mode: Script to Win
+- Enemy AI is EXTREMELY smart (complex PoohScript)
+- You MUST write your own combat automation
+- Your PoohScripts vs their PoohScripts
+- Battle is decided by who wrote better code
+- **Goal:** Build better AI than the enemy
+
+### Master Mode: AI Overlord
+- All actions must be automated via PoohScript
+- Write complete ship automation
+- Hack AND control multiple enemy ships
+- Build a fleet controlled by your scripts
+- **Goal:** Create the ultimate autonomous combat system
+
+## 🤖 Enemy AI System (PoohScript!)
+
+**This is the core innovation of SpaceCMD:** Enemy behavior is NOT hard-coded Python. It's real PoohScript running on enemy ship operating systems.
+
+### Example: Enemy Weapon Control Script
+
+This is ACTUAL code running on enemy ships at `/usr/bin/weapon_control`:
+
+```python
+#!/usr/bin/pooscript
+# Automatic Weapons Control System
+
+# Read weapon status from /proc
+weapons = vfs.read("/proc/systems/weapons")
+charge = 0
+for line in weapons.split("\n"):
+    if "charge:" in line:
+        charge = int(line.split(":")[1].strip())
+
+# Read enemy (player) status
+enemy_shields = int(vfs.read("/proc/enemy/shields").strip())
+enemy_hull = int(vfs.read("/proc/enemy/hull").strip())
+
+# Firing logic
+if charge >= 100:
+    if enemy_shields > 0:
+        print("FIRE: laser shields")  # Target shields first
+        vfs.write("/proc/systems/weapons", "online\npower: 2\ncharge: 0\nmax_charge: 100")
+    else:
+        print("FIRE: laser weapons")  # Disable their weapons
+        vfs.write("/proc/systems/weapons", "online\npower: 2\ncharge: 0\nmax_charge: 100")
+else:
+    # Charge weapons
+    new_charge = min(100, charge + 10)
+    vfs.write("/proc/systems/weapons", f"online\npower: 2\ncharge: {new_charge}\nmax_charge: 100")
+```
+
+**This runs every game tick on the enemy ship's OS. You can hack it, disable it, or steal it!**
+
+### How Enemy AI Works
+
+1. Enemy ship boots up with Unix-like OS
+2. Scripts in `/usr/bin/` are loaded
+3. `/etc/cron/jobs` lists which scripts run each tick:
+   - `weapon_control` - Charges and fires weapons
+   - `shield_manager` - Manages shield power
+   - `damage_control` - Repairs systems
+   - `tactical_ai` - Makes strategic decisions
+4. Scripts read `/proc/` to get ship/enemy status
+5. Scripts write to `/proc/` or `/sys/` to control systems
+6. All output is captured and translated to game actions
+
+**You can hack into enemy ships and disable these scripts!**
+
+## 🛠️ Commands (All PoohScript!)
+
+### Basic Ship Control
 ```bash
-# Ship status
-status              # Show complete ship status
-systems             # List all ship systems
-crew                # Show autonomous crew bot status
-rooms               # Show room status
+status              # Show ship status (PoohScript in /bin/status)
+systems             # List systems (PoohScript in /bin/systems)
+crew                # Show crew (PoohScript in /bin/crew)
+power <sys> <amt>   # Adjust power (PoohScript in /bin/power)
+fire <weapon>       # Fire weapon (PoohScript in /bin/fire)
+```
 
-# Power management
-power               # Show power allocation
-power shields 3     # Allocate 3 power to shields
+### Hacking Commands (Attack Enemy Ships!)
+```bash
+# Infiltrate enemy filesystem
+hack ls /usr/bin/           # List enemy AI scripts
+hack cat /usr/bin/weapon_control  # Read their weapon AI
+hack cat /etc/cron/jobs     # See which scripts run
 
-# Room control
-vent helm           # Toggle venting in helm
+# Disable enemy automation
+hack_disable weapon_control # Remove from cron, disable firing
+hack_disable shield_manager # Stop shield regeneration
+hack_disable damage_control # Prevent repairs
 
-# Unix commands
-ls /sys/ship/systems    # List systems
-cat /dev/ship/hull      # Read hull device
-cat /proc/ship/status   # View ship status
-cat /proc/ship/crew_ai  # View crew AI activity
+# Steal enemy AI for yourself
+hack_steal weapon_control   # Copy to your /usr/local/bin/
+hack_steal tactical_ai      # Steal their tactics
+
+# Advanced hacking
+hack_edit /etc/ship/config  # Modify enemy behavior
+hack_backdoor               # Install persistent access
+hack_control <ship>         # Take full control
+
+# View what you've hacked
+hacked_ships                # List ships under your control
+```
+
+### Unix Commands (Direct Filesystem Access)
+```bash
+ls /proc/ship/              # List ship status files
+cat /proc/ship/hull         # Read hull points
+cat /proc/systems/weapons   # Read weapon status
+cat /usr/bin/status         # Read the status command source
 ```
 
 ## 🔧 Hacking
@@ -199,34 +344,60 @@ for system in systems:
         print(status.strip())
 ```
 
-## 🎯 Architecture
+## 🎯 Architecture & Design Principles
 
-SpaceCMD is built on a layered architecture:
+### Core Design Principle: AVOID HARD-CODED PYTHON
+
+**SpaceCMD is script-driven, NOT Python-driven.**
+
+❌ **DON'T:** Write Python functions that implement game behavior
+✅ **DO:** Write PoohScript files that implement game behavior
+
+❌ **DON'T:** Create Python AI classes for enemies
+✅ **DO:** Create PoohScript files in enemy `/usr/bin/`
+
+❌ **DON'T:** Hard-code combat logic in Python
+✅ **DO:** Write PoohScript automation that reads `/proc/` files
+
+**Everything must be hackable. If it's hard-coded in Python, players can't hack it!**
+
+### Architecture
 
 ```
 ┌─────────────────────────────────────┐
-│     Game UI (Terminal/LCARS)        │
+│     Game UI (LCARS 3-Panel)         │  Shows ship interiors
 ├─────────────────────────────────────┤
-│      PooScript Shell & Commands     │
+│   PoohScript Interpreter            │  Executes ALL game logic
 ├─────────────────────────────────────┤
-│     ShipOS (Unix-like System)       │
+│     Multiple ShipOS Instances       │  Player + Enemy ships
 │  ┌──────────┬──────────┬──────────┐ │
-│  │   VFS    │ Process  │  Kernel  │ │
-│  │          │  Manager │ Syscalls │ │
+│  │ /proc/   │ /usr/bin/│  VFS +   │ │  Each ship = Unix system
+│  │ Status   │ AI Scripts│ Kernel  │ │
 │  └──────────┴──────────┴──────────┘ │
 ├─────────────────────────────────────┤
-│   Autonomous Crew AI + Ship Physics │
+│   Ship Physics (Minimal Python)     │  Only physics, no AI
 └─────────────────────────────────────┘
 ```
 
-### Components
+### What's Implemented in PoohScript vs Python
 
-- **ShipOS**: Complete Unix-like OS with VFS, processes, permissions
-- **PooScript**: Safe Python-subset scripting language
-- **Kernel**: Syscall interface (`open`, `read`, `write`, `readdir`)
-- **Device Files**: Ship hardware exposed as character devices
-- **Crew AI**: Autonomous bots that manage repairs and emergencies
-- **Ship Systems**: Physics simulation for power, damage, combat
+**PoohScript (Hackable):**
+- Enemy weapon control AI
+- Enemy shield management
+- Enemy damage control
+- Enemy tactical decisions
+- Player automation scripts
+- All commands (`status`, `fire`, `power`, etc.)
+- Crew bot behavior (future)
+
+**Python (Infrastructure Only):**
+- PoohScript interpreter
+- VFS/filesystem implementation
+- Terminal UI rendering
+- Physics calculations (damage, power)
+- Network between ship OSes
+
+**The rule:** If a player should be able to hack it, it MUST be PoohScript.
 
 ## 🎨 Ships Available
 

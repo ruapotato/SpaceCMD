@@ -10,10 +10,10 @@ from .weapons import create_weapon
 
 def create_kestrel() -> Ship:
     """
-    Create the Kestrel - a balanced human cruiser.
+    Create the Nautilus - a balanced human cruiser.
     Good starting ship with all basic systems.
     """
-    ship = Ship("Kestrel", "Human Cruiser")
+    ship = Ship("Nautilus", "Human Cruiser")
 
     # Resources
     ship.hull_max = 30
@@ -126,9 +126,9 @@ def create_kestrel() -> Ship:
 
 def create_stealth_cruiser() -> Ship:
     """
-    Create a Stealth Cruiser - weak hull, no shields, but has cloaking.
+    Create the Cucumber - weak hull, no shields, but has cloaking.
     """
-    ship = Ship("Shadow", "Stealth Cruiser")
+    ship = Ship("Cucumber", "Stealth Cruiser")
 
     ship.hull_max = 20
     ship.hull = 20
@@ -203,9 +203,9 @@ def create_stealth_cruiser() -> Ship:
 
 def create_mantis_cruiser() -> Ship:
     """
-    Create a Mantis Boarding Ship - teleporter, strong crew combat.
+    Create the Hairpin - teleporter, strong crew combat.
     """
-    ship = Ship("Devastator", "Mantis Cruiser")
+    ship = Ship("Hairpin", "Mantis Cruiser")
 
     ship.hull_max = 25
     ship.hull = 25

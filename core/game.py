@@ -38,6 +38,8 @@ class Game:
         # Initialize UI
         if use_terminal_ui:
             self.ui = TerminalUI()
+            # Set player ship name in tactical display
+            self.ui.set_player_ship_name(ship.name.upper())
         else:
             self.ui = None
 
@@ -63,9 +65,12 @@ class Game:
         if self.ui:
             # Update viewport with combat info
             if self.in_combat and self.enemy_ship:
-                self.ui.add_enemy(self.ui.width - 20, self.ui.viewport_height // 2)
+                # Create enemy ship layout from enemy ship data
+                from .terminal_ui import ShipLayout
+                enemy_layout = ShipLayout(self.enemy_ship.name.upper())
+                self.ui.set_enemy_ship(enemy_layout)
             else:
-                self.ui.clear_enemies()
+                self.ui.clear_enemy()
 
             # Render terminal UI
             self.ui.render_frame(

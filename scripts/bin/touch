@@ -1,0 +1,22 @@
+#!/usr/bin/pooscript
+# Create empty files or update timestamps
+
+if not args:
+    print("touch: missing file operand", file=stderr)
+    exit(1)
+
+for filename in args:
+    # Check if file exists
+    try:
+        fd = kernel.open(filename, kernel.O_RDONLY)
+        # File exists, just update timestamp (in a real system)
+        # For now, we'll just close it since VFS doesn't track timestamps yet
+        kernel.close(fd)
+    except:
+        # File doesn't exist, create it
+        try:
+            fd = kernel.open(filename, kernel.O_WRONLY | kernel.O_CREAT, 0o644)
+            kernel.close(fd)
+        except Exception as e:
+            print(f"touch: cannot touch '{filename}': {e}", file=stderr)
+            exit(1)
