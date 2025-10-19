@@ -1,0 +1,13 @@
+#!/usr/bin/pooscript
+# Display weapons status
+
+try:
+    fd = kernel.open("/proc/ship/weapons", kernel.O_RDONLY)
+    weapons_info = kernel.read(fd, 4096).decode('utf-8')
+    kernel.close(fd)
+
+    print(weapons_info.strip())
+
+except Exception as e:
+    error(f"Failed to read weapons: {e}")
+    exit(1)

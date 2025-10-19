@@ -1,0 +1,43 @@
+#!/usr/bin/pooscript
+# Target enemy subsystem for weapons
+
+if len(args) == 0:
+    # Show current target
+    try:
+        fd = kernel.open("/dev/ship/target", kernel.O_RDONLY)
+        current_target = kernel.read(fd, 1024).decode('utf-8').strip()
+        kernel.close(fd)
+
+        print(f"Current target: {current_target}")
+        print("")
+        print("Available targets:")
+
+        # Show enemy systems
+        fd = kernel.open("/proc/ship/enemy", kernel.O_RDONLY)
+        enemy_info = kernel.read(fd, 4096).decode('utf-8')
+        kernel.close(fd)
+
+        print(enemy_info)
+
+    except Exception as e:
+        error(f"No combat active or failed to read target: {e}")
+        exit(1)
+
+else:
+    # Set target
+    room_name = " ".join(args)
+
+    try:
+        fd = kernel.open("/dev/ship/target", kernel.O_WRONLY)
+        bytes_written = kernel.write(fd, room_name.encode('utf-8'))
+        kernel.close(fd)
+
+        if bytes_written > 0:
+            print(f"🎯 Targeting: {room_name}")
+        else:
+            error(f"Failed to set target (invalid room name?)")
+            exit(1)
+
+    except Exception as e:
+        error(f"Failed to set target: {e}")
+        exit(1)

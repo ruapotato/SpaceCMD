@@ -92,7 +92,7 @@ class Room:
     @property
     def is_functional(self) -> bool:
         """Can this room's system operate?"""
-        return (self.health > 0 and
+        return (self.health > 0.2 and  # Systems work until they're severely damaged (< 20%)
                 self.power_allocated > 0 and
                 not self.breached and
                 len(self.crew) > 0)  # Need crew to operate most systems
@@ -292,6 +292,7 @@ class Ship:
         - Update oxygen levels
         - Handle fires
         - Check crew status
+        - Autonomous crew actions (repair, fight fires, etc.)
         """
         # Update all systems
         for system in self.systems.values():
@@ -301,6 +302,9 @@ class Ship:
         weapons_powered = SystemType.WEAPONS in self.systems and self.systems[SystemType.WEAPONS].is_online()
         for weapon in self.weapons:
             weapon.update(dt, weapons_powered)
+
+        # Autonomous crew actions (AI bots manage themselves!)
+        self._update_crew_ai(dt)
 
         # Update oxygen (spreads between connected rooms)
         self._update_oxygen(dt)
@@ -315,6 +319,49 @@ class Ship:
                 # Shields recharge when not taking damage
                 self.shields = min(self.shields_max,
                                    self.shields + dt * shields_system.get_effectiveness())
+
+    def _update_crew_ai(self, dt: float):
+        """
+        Autonomous crew AI - bots manage ship automatically!
+        Priority:
+        1. Fight fires (critical)
+        2. Repair damaged systems
+        3. Heal in medbay if injured
+        4. Operate their assigned system
+        """
+        for crew in self.crew:
+            if not crew.is_alive or not crew.room:
+                continue
+
+            # Priority 1: Fight fires
+            if crew.room.on_fire:
+                # Fighting fire (put it out over time)
+                import random
+                if random.random() < dt * 0.3:  # 30% chance per second to extinguish
+                    crew.room.on_fire = False
+                continue
+
+            # Priority 2: Repair damaged systems
+            if crew.room.health < 1.0:
+                crew.repair_system(dt * 3.0)  # 3x faster repair for bots!
+                continue
+
+            # Priority 3: Heal in medbay if injured
+            if crew.health < crew.health_max * 0.8:  # Below 80% health
+                # Try to go to medbay
+                medbay_room = None
+                for room in self.rooms.values():
+                    if room.system_type == SystemType.MEDBAY and room.is_functional:
+                        medbay_room = room
+                        break
+
+                if medbay_room and crew.room == medbay_room:
+                    # Heal in medbay (it repairs bots!)
+                    heal_rate = 10.0  # 10 HP per second
+                    crew.heal(dt * heal_rate)
+
+            # Priority 4: Just operate their system (already in room)
+            # Crew just being present in room provides bonuses
 
     def _update_oxygen(self, dt: float):
         """Update oxygen levels in all rooms"""
@@ -456,9 +503,9 @@ class Crew:
         if not self.room or self.room.health >= 1.0:
             return
 
-        # Repair speed based on skill
+        # Repair speed based on skill (bots repair fast!)
         repair_skill = self.skills.repair
-        repair_rate = 0.1 * (1 + repair_skill * 0.5)  # 50% faster per skill level
+        repair_rate = 0.2 * (1 + repair_skill * 0.5)  # Base 20% per second (2x faster than before)
 
         self.room.repair(dt * repair_rate)
 

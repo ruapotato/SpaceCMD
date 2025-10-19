@@ -9,6 +9,59 @@ from .weapons import create_weapon
 import random
 
 
+def create_gnat() -> Ship:
+    """
+    Create a tiny, weak gnat-class ship.
+    Perfect for tutorial - barely any threat!
+    """
+    ship = Ship("Hostile Gnat", "Gnat-class Drone")
+
+    # Very weak stats - tutorial enemy
+    ship.hull_max = 5
+    ship.hull = 5
+    ship.reactor_power = 2
+    ship.power_available = 2
+    ship.fuel = 0
+    ship.scrap = 5  # Small reward
+
+    # Minimal layout - just one tiny room
+    helm = Room("Core", SystemType.HELM, x=0, y=0)
+    ship.add_room(helm)
+
+    weapons = Room("Weapon Pod", SystemType.WEAPONS, x=1, y=0)
+    weapons.max_power = 1
+    ship.add_room(weapons)
+
+    helm.connect_to(weapons)
+
+    # Minimal systems
+    ship.add_system(ShipSystem("Core", SystemType.HELM), "Core")
+    ship.add_system(ShipSystem("Weapon Pod", SystemType.WEAPONS), "Weapon Pod")
+
+    # Minimal power
+    ship.allocate_power(SystemType.WEAPONS, 1)
+
+    # NO shields - super vulnerable
+    ship.shields_max = 0
+    ship.shields = 0
+
+    # Weak AI crew - need crew in weapons room for it to function!
+    pilot = Crew("Rogue AI", "robot")
+    pilot.skills.weapons = 1  # Give some skill so it can fire
+    pilot.health = 20
+    ship.add_crew_member(pilot)
+    pilot.assign_to_room(weapons)  # Put in weapons room so it can fire!
+
+    # Very weak weapon - START CHARGED so it fires immediately!
+    laser = create_weapon("basic_laser")
+    laser.damage = 2  # Weak damage for tutorial enemy
+    laser.cooldown = 15.0  # Slow firing
+    laser.charge = 1.0  # START FULLY CHARGED!
+    ship.add_weapon(laser)
+
+    return ship
+
+
 def create_pirate_scout() -> Ship:
     """
     Create a weak pirate scout ship.
@@ -71,8 +124,9 @@ def create_pirate_scout() -> Ship:
     ship.add_crew_member(pirate2)
     pirate2.assign_to_room(weapons)
 
-    # Weapons
+    # Weapons - start charged!
     laser = create_weapon("basic_laser")
+    laser.charge = 1.0  # Ready to fire immediately
     ship.add_weapon(laser)
 
     return ship
@@ -134,8 +188,9 @@ def create_mantis_fighter() -> Ship:
     ship.add_crew_member(mantis2)
     mantis2.assign_to_room(weapons)
 
-    # Weapons
+    # Weapons - start charged!
     laser = create_weapon("basic_laser")
+    laser.charge = 1.0  # Ready to fire immediately
     ship.add_weapon(laser)
 
     return ship
@@ -198,8 +253,9 @@ def create_rebel_fighter() -> Ship:
     ship.add_crew_member(rebel2)
     rebel2.assign_to_room(weapons)
 
-    # Better weapons
+    # Better weapons - start charged!
     burst = create_weapon("burst_laser_ii")
+    burst.charge = 1.0  # Ready to fire immediately
     ship.add_weapon(burst)
 
     return ship
@@ -207,6 +263,7 @@ def create_rebel_fighter() -> Ship:
 
 # Enemy ship catalog
 ENEMY_SHIPS = {
+    "gnat": create_gnat,
     "pirate_scout": create_pirate_scout,
     "mantis_fighter": create_mantis_fighter,
     "rebel_fighter": create_rebel_fighter,
@@ -216,9 +273,12 @@ ENEMY_SHIPS = {
 def create_random_enemy(difficulty: int = 1) -> Ship:
     """
     Create a random enemy ship based on difficulty.
-    difficulty: 1-3 (easy to hard)
+    difficulty: 0-3 (tutorial to hard)
     """
-    if difficulty == 1:
+    if difficulty == 0:
+        # Tutorial mode - always gnat
+        return create_gnat()
+    elif difficulty == 1:
         choices = ["pirate_scout"]
     elif difficulty == 2:
         choices = ["pirate_scout", "mantis_fighter"]

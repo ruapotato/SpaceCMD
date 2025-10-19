@@ -102,10 +102,10 @@ class Theme:
         if not mono_font:
             mono_font = pygame.font.get_default_font()
 
-        Theme.FONT_TERMINAL = pygame.font.SysFont(mono_font, 14)
-        Theme.FONT_TITLE = pygame.font.SysFont('sans-serif', 12, bold=True)
-        Theme.FONT_UI = pygame.font.SysFont('sans-serif', 11)
-        Theme.FONT_SMALL = pygame.font.SysFont('sans-serif', 10)
+        Theme.FONT_TERMINAL = pygame.font.SysFont(mono_font, 18)
+        Theme.FONT_TITLE = pygame.font.SysFont('sans-serif', 16, bold=True)
+        Theme.FONT_UI = pygame.font.SysFont('sans-serif', 14)
+        Theme.FONT_SMALL = pygame.font.SysFont('sans-serif', 13)
 
 
 def draw_rounded_rect(surface, color, rect, radius=5):

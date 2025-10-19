@@ -188,10 +188,14 @@ class Desktop:
 
         # Menu state
         self.menu_open = False
-        self.menu_rect = pygame.Rect(4, height - Theme.TASKBAR_HEIGHT - 280, 180, 280)
+        self.menu_rect = pygame.Rect(4, height - Theme.TASKBAR_HEIGHT - 320, 200, 320)
 
         # ShipOS reference (will be set by play.py)
         self.ship_os = None
+
+        # Attack flash effect
+        self.attack_flash = 0.0  # 0.0 = no flash, 1.0 = full red flash
+        self.attack_flash_color = (255, 0, 0)  # Red for damage
 
     def _create_starfield(self, count):
         """Create starfield with random stars"""
@@ -268,6 +272,20 @@ class Desktop:
         # Make tactical display much larger and more impressive!
         tactical = TacticalWidget(900, 650)
         window = Window(title, x, y, 900, 650, tactical)
+        self.add_window(window)
+        return window
+
+    def create_map_window(self, title="Galaxy Map", x=100, y=50):
+        """
+        Create a galaxy map window.
+
+        Returns:
+            Window: The created window
+        """
+        from .map_widget_v2 import MapWidgetV2
+
+        map_widget = MapWidgetV2(800, 600)
+        window = Window(title, x, y, 800, 600, map_widget)
         self.add_window(window)
         return window
 
@@ -353,6 +371,10 @@ class Desktop:
                         # Ctrl+D: Tactical display
                         self.create_tactical_window()
                         continue
+                    elif event.key == pygame.K_m:
+                        # Ctrl+M: Galaxy map
+                        self.create_map_window()
+                        continue
 
             # Get mouse position
             mouse_pos = pygame.mouse.get_pos()
@@ -381,7 +403,9 @@ class Desktop:
                         self.create_text_editor_window()
                     elif item_index == 3:  # Tactical Display
                         self.create_tactical_window()
-                    elif item_index == 5:  # Quit (after separator)
+                    elif item_index == 4:  # Galaxy Map
+                        self.create_map_window()
+                    elif item_index == 6:  # Quit (after separator)
                         self.running = False
 
                     self.menu_open = False
@@ -398,6 +422,17 @@ class Desktop:
                         self.focus_window(window)
                     break
 
+    def trigger_attack_flash(self, intensity=1.0, color=(255, 0, 0)):
+        """
+        Trigger screen flash effect (for attacks, damage, etc.)
+
+        Args:
+            intensity: Flash intensity (0.0 to 1.0)
+            color: Flash color (default red for damage)
+        """
+        self.attack_flash = max(self.attack_flash, intensity)
+        self.attack_flash_color = color
+
     def update(self, dt):
         """
         Update desktop state.
@@ -412,6 +447,20 @@ class Desktop:
         # Update top bar
         if self.topbar:
             self.topbar.update(dt)
+
+        # Update tactical widget from combat state (if available)
+        if hasattr(self, '_tactical_widget') and self._tactical_widget:
+            world_manager = getattr(self._tactical_widget, 'world_manager', None)
+            if world_manager and world_manager.combat_state:
+                self._tactical_widget.update_from_combat(world_manager.combat_state)
+
+                # Update combat log with new events
+                combat_log = world_manager.combat_state.log
+                if combat_log:
+                    # Add new log entries
+                    for log_entry in combat_log:
+                        if log_entry not in self._tactical_widget.command_log:
+                            self._tactical_widget.command_log.append(log_entry)
 
         # Update windows
         for window in self.windows:
@@ -428,6 +477,10 @@ class Desktop:
                 if self.topbar:
                     available_height -= self.topbar.height
                 window.maximize(self.width, available_height, Theme.TASKBAR_HEIGHT)
+
+        # Decay attack flash
+        if self.attack_flash > 0:
+            self.attack_flash = max(0, self.attack_flash - dt * 3.0)  # Fade out over ~0.3 seconds
 
     def render(self):
         """Render the desktop"""
@@ -461,6 +514,13 @@ class Desktop:
         if self.menu_open:
             self._render_menu()
 
+        # Render attack flash overlay
+        if self.attack_flash > 0:
+            flash_surface = pygame.Surface((self.width, self.height))
+            flash_surface.set_alpha(int(self.attack_flash * 100))  # Max 100 alpha
+            flash_surface.fill(self.attack_flash_color)
+            self.screen.blit(flash_surface, (0, 0))
+
         # Update display
         pygame.display.flip()
 
@@ -476,6 +536,7 @@ class Desktop:
             "File Browser",
             "Text Editor",
             "Tactical Display",
+            "Galaxy Map",
             "---",
             "Quit"
         ]

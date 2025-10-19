@@ -1,0 +1,44 @@
+#!/usr/bin/pooscript
+# Jump to a new location on the map
+
+if len(args) == 0:
+    error("Usage: jump <node_id>")
+    print("")
+    print("Available destinations:")
+    print("")
+
+    # Show available jumps
+    try:
+        fd = kernel.open("/proc/ship/jumps", kernel.O_RDONLY)
+        jumps_info = kernel.read(fd, 4096).decode('utf-8')
+        kernel.close(fd)
+        print(jumps_info.strip())
+    except Exception as e:
+        error(f"Failed to read jumps: {e}")
+
+    print("")
+    print("Example: jump S1N2")
+    exit(1)
+
+else:
+    # Execute jump
+    node_id = args[0]
+
+    print(f"Initiating FTL jump to {node_id}...")
+    print("")
+
+    # Write to jump device
+    try:
+        fd = kernel.open("/dev/ship/jump", kernel.O_WRONLY)
+        bytes_written = kernel.write(fd, node_id.encode('utf-8'))
+        kernel.close(fd)
+
+        if bytes_written > 0:
+            print("🚀 Jump complete!")
+        else:
+            error("Jump failed! Invalid destination or in combat")
+            exit(1)
+
+    except Exception as e:
+        error(f"Jump failed: {e}")
+        exit(1)

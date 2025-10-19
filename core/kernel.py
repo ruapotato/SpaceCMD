@@ -192,9 +192,8 @@ class Kernel:
         if inode.is_device():
             device_name = inode.content
             if device_name in self.vfs.device_handlers:
-                handler = self.vfs.device_handlers[device_name]
-                if 'read' in handler:
-                    return handler['read']()
+                read_handler, _ = self.vfs.device_handlers[device_name]
+                return read_handler(count)
             return b''
 
         # Regular file
@@ -239,10 +238,9 @@ class Kernel:
         if inode.is_device():
             device_name = inode.content
             if device_name in self.vfs.device_handlers:
-                handler = self.vfs.device_handlers[device_name]
-                if 'write' in handler:
-                    result = handler['write'](data)
-                    return len(data) if result else -1
+                _, write_handler = self.vfs.device_handlers[device_name]
+                result = write_handler(data)
+                return result if result >= 0 else -1
             return len(data)  # Pretend success for devices without handlers
 
         # Regular file - append data

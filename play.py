@@ -54,6 +54,44 @@ def run_gui_mode(ship_type=None):
     # Set ship_os in desktop (creates top bar with system monitor)
     desktop.set_ship_os(ship_os)
 
+    # Create world manager (Python layer controls world, not ShipOS)
+    from core.world_manager import WorldManager
+    world_manager = WorldManager(ship_os)
+    ship_os.world_manager = world_manager  # Give ShipOS reference to world
+
+    # Wire up attack callback to desktop flash effect
+    world_manager.on_attack_callback = desktop.trigger_attack_flash
+
+    # For tutorial: spawn a gnat immediately after 5 seconds
+    def tutorial_encounter():
+        """Spawn tutorial enemy after delay"""
+        import time
+        time.sleep(5.0)
+        if desktop.running:
+            print("\n📡 Incoming transmission detected...")
+            time.sleep(1.0)
+            print("⚠️  Unidentified craft approaching!")
+            time.sleep(0.5)
+            world_manager.trigger_encounter("gnat", forced=True)
+
+    import threading
+    tutorial_thread = threading.Thread(target=tutorial_encounter, daemon=True)
+    tutorial_thread.start()
+
+    # Start update loops in background
+    def update_world_and_ship():
+        """Update world and ship state continuously"""
+        import time
+        while desktop.running:
+            # Update world (spawns enemies, manages combat)
+            world_manager.update(0.1)
+            # Update ship (physics, crew, oxygen)
+            ship_os.update_ship_state(0.1)
+            time.sleep(0.1)
+
+    world_thread = threading.Thread(target=update_world_and_ship, daemon=True)
+    world_thread.start()
+
     # Override desktop's create_terminal_window to integrate with ShipOS
     original_create_terminal = desktop.create_terminal_window
 
@@ -103,8 +141,22 @@ def run_gui_mode(ship_type=None):
     topbar_height = desktop.topbar.height if desktop.topbar else 32
     desktop.create_terminal_window("Ship Terminal", 50, topbar_height + 20)
 
-    # Create tactical display
-    desktop.create_tactical_window("Tactical Display", 600, topbar_height + 20)
+    # Create tactical display and wire to world manager
+    tactical_window = desktop.create_tactical_window("Tactical Display", 600, topbar_height + 20)
+    if tactical_window:
+        tactical_widget = tactical_window.content_widget
+        tactical_widget.world_manager = world_manager
+        tactical_widget.ship_os = ship_os  # Wire up ship_os for command execution
+
+        # Update tactical from combat every frame
+        desktop._tactical_widget = tactical_widget
+
+    # Create galaxy map window and wire to world manager
+    map_window = desktop.create_map_window("Galaxy Map", 50, topbar_height + 50)
+    if map_window:
+        map_widget = map_window.content_widget
+        map_widget.set_world_manager(world_manager)
+        map_widget.ship_os = ship_os  # Wire up ship_os for command execution
 
     # Make stars static (they'll move when ship moves)
     desktop.warp_speed = 0

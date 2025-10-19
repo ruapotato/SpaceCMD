@@ -1,0 +1,13 @@
+#!/usr/bin/pooscript
+# Display combat status
+
+try:
+    fd = kernel.open("/proc/ship/combat", kernel.O_RDONLY)
+    combat_info = kernel.read(fd, 4096).decode('utf-8')
+    kernel.close(fd)
+
+    print(combat_info.strip())
+
+except Exception as e:
+    error(f"Failed to read combat status: {e}")
+    exit(1)

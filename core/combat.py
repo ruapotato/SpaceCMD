@@ -9,6 +9,15 @@ from .ship import Ship, Room, SystemType
 from .weapons import Weapon
 import random
 
+# Import sound effects (optional - will work without sounds)
+try:
+    from core.audio.sound_fx import play_sound
+    SOUNDS_ENABLED = True
+except:
+    SOUNDS_ENABLED = False
+    def play_sound(name, volume=1.0):
+        pass
+
 
 class CombatState:
     """
@@ -54,10 +63,12 @@ class CombatState:
         if self.player_ship.hull <= 0:
             self.active = False
             self.log_event("💀 YOUR SHIP HAS BEEN DESTROYED!")
+            play_sound("explosion", 1.0)
 
         if self.enemy_ship.hull <= 0:
             self.active = False
             self.log_event("✓ Enemy ship destroyed!")
+            play_sound("explosion", 0.8)
 
     def _enemy_ai(self, dt: float):
         """Simple enemy AI"""
@@ -100,6 +111,16 @@ class CombatState:
 
         attacker_name = "You" if attacker == self.player_ship else attacker.name
 
+        # Play weapon fire sound
+        weapon_sound = "laser_fire"  # Default
+        if hasattr(weapon, 'weapon_type'):
+            weapon_type_str = weapon.weapon_type.value  # Get enum value as string
+            if "missile" in weapon_type_str:
+                weapon_sound = "missile_fire"
+            elif "beam" in weapon_type_str:
+                weapon_sound = "beam_fire"
+        play_sound(weapon_sound, 0.5)
+
         # Calculate damage
         total_damage = weapon.damage * weapon.shots
 
@@ -112,28 +133,38 @@ class CombatState:
             self.log_event(f"{attacker_name} fired {weapon.name}!")
             if shield_damage > 0:
                 self.log_event(f"  🛡️  Enemy shields absorbed {int(shield_damage)} damage")
+                # Shield hit sound
+                play_sound("shield_hit", 0.6)
 
         # Remaining damage hits hull and systems
         if total_damage > 0:
             defender.hull -= total_damage
             self.log_event(f"  💥 {int(total_damage)} hull damage!")
+            # Hull hit sound
+            play_sound("hull_hit", 0.7)
 
             # Damage specific system if targeted
             if target_room_name and target_room_name in defender.rooms:
                 room = defender.rooms[target_room_name]
-                system_damage = total_damage * 0.15  # 15% of hull damage goes to system
+                system_damage = total_damage * 0.03  # Only 3% of hull damage goes to system (much less fragile)
                 room.take_damage(system_damage)
-                self.log_event(f"  ⚠️  {room.name} damaged!")
 
-                # Chance of fire
-                if random.random() < 0.2:
+                # Only log if significant damage
+                if room.health < 0.7:
+                    self.log_event(f"  ⚠️  {room.name} damaged! ({room.health:.0%})")
+                    play_sound("system_damage", 0.5)
+
+                # Much lower chance of fire (only 5%)
+                if random.random() < 0.05:
                     room.on_fire = True
                     self.log_event(f"  🔥 Fire in {room.name}!")
+                    play_sound("alarm", 0.4)
 
-                # Chance of breach
-                if random.random() < 0.1 and total_damage >= 2:
+                # Very low chance of breach (only 2% and needs big damage)
+                if random.random() < 0.02 and total_damage >= 5:
                     room.breached = True
                     self.log_event(f"  💨 {room.name} breached!")
+                    play_sound("alarm", 0.5)
 
         return True
 

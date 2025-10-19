@@ -1,0 +1,13 @@
+#!/usr/bin/pooscript
+# Display enemy ship information
+
+try:
+    fd = kernel.open("/proc/ship/enemy", kernel.O_RDONLY)
+    enemy_info = kernel.read(fd, 4096).decode('utf-8')
+    kernel.close(fd)
+
+    print(enemy_info.strip())
+
+except Exception as e:
+    error(f"Failed to read enemy info: {e}")
+    exit(1)

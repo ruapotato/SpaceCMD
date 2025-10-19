@@ -119,6 +119,7 @@ def create_kestrel() -> Ship:
 
     # Add starting weapons
     burst_laser = create_weapon("burst_laser_ii")
+    burst_laser.charge = 1.0  # Start fully charged and ready to fire!
     ship.add_weapon(burst_laser)
 
     return ship

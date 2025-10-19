@@ -1,0 +1,71 @@
+#!/usr/bin/pooscript
+# Fire weapon at current target
+
+if len(args) == 0:
+    error("Usage: fire <weapon_number>")
+    print("")
+
+    # Show weapons
+    try:
+        fd = kernel.open("/proc/ship/weapons", kernel.O_RDONLY)
+        weapons_info = kernel.read(fd, 4096).decode('utf-8')
+        kernel.close(fd)
+
+        print(weapons_info.strip())
+        print("")
+        print("Example: fire 1")
+
+    except Exception as e:
+        error(f"Failed to read weapons: {e}")
+
+    exit(1)
+
+else:
+    # Fire weapon (convert from 1-based to 0-based)
+    try:
+        weapon_num = int(args[0])
+        weapon_idx = weapon_num - 1  # User sees 1-based, kernel uses 0-based
+
+        if weapon_idx < 0:
+            error("Weapon number must be >= 1")
+            exit(1)
+
+        # Check current target
+        target_fd = kernel.open("/dev/ship/target", kernel.O_RDONLY)
+        current_target = kernel.read(target_fd, 1024).decode('utf-8').strip()
+        kernel.close(target_fd)
+
+        if current_target == "None" or current_target == "No combat active":
+            error("No target selected! Use 'target <system>' first")
+            exit(1)
+
+        # Check weapons system health
+        try:
+            health_fd = kernel.open("/sys/ship/systems/weapons/health", kernel.O_RDONLY)
+            health_str = kernel.read(health_fd, 128).decode('utf-8').strip()
+            kernel.close(health_fd)
+            health = float(health_str)
+
+            if health <= 0:
+                error("⚠️  WEAPONS SYSTEM DESTROYED!")
+                error("Cannot fire - system is completely offline")
+                exit(1)
+            elif health < 0.3:
+                print("⚠️  WARNING: Weapons system critically damaged!")
+        except:
+            pass  # If we can't check health, try to fire anyway
+
+        # Fire the weapon
+        fd = kernel.open("/dev/ship/fire", kernel.O_WRONLY)
+        bytes_written = kernel.write(fd, str(weapon_idx).encode('utf-8'))
+        kernel.close(fd)
+
+        if bytes_written > 0:
+            print(f"⚡ Firing weapon {weapon_num} at {current_target}!")
+        else:
+            error(f"Failed to fire weapon (not ready or unavailable)")
+            exit(1)
+
+    except ValueError:
+        error("Invalid weapon number")
+        exit(1)

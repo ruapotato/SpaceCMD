@@ -1,28 +1,61 @@
 #!/usr/bin/pooscript
-# Display autonomous crew bot status
+# Display autonomous crew bot status or assign crew to rooms
 
-print("=" * 60)
-print("AUTONOMOUS CREW BOTS")
-print("=" * 60)
+# Check for assign subcommand
+if len(args) >= 1 and args[0] == "assign":
+    # Usage: crew assign <crew_name> <room_name>
+    if len(args) < 3:
+        error("Usage: crew assign <crew_name> <room_name>")
+        print("")
+        print("Example: crew assign Lieutenant Hayes Weapons")
+        exit(1)
 
-try:
-    # Read crew AI status from procfs
-    ai_fd = kernel.open("/proc/ship/crew_ai", kernel.O_RDONLY)
-    ai_status = kernel.read(ai_fd, 4096).decode('utf-8')
-    kernel.close(ai_fd)
+    # Room name is last argument (always single word)
+    # Crew name is all arguments before that (may have spaces)
+    room_name = args[-1]  # Last argument
+    crew_name = ' '.join(args[1:-1])  # Everything between "assign" and room name
 
-    print(ai_status.strip())
+    # Write to crew assignment device file
+    try:
+        # Format: "crew_name room_name"
+        assign_data = f"{crew_name} {room_name}"
+        fd = kernel.open("/dev/ship/crew_assign", kernel.O_WRONLY)
+        bytes_written = kernel.write(fd, assign_data.encode('utf-8'))
+        kernel.close(fd)
 
-    print()
-    print("Crew bots automatically handle:")
-    print("  - System repairs when damaged")
-    print("  - Fire suppression")
-    print("  - Oxygen level monitoring")
-    print("  - System operation")
-    print()
-    print("No manual assignment needed - bots manage themselves!")
+        if bytes_written > 0:
+            print(f"✓ Assigned {crew_name} to {room_name}")
+        else:
+            error(f"Failed to assign {crew_name} to {room_name}")
+            exit(1)
+    except Exception as e:
+        error(f"Failed to assign crew: {e}")
+        exit(1)
+
+else:
+    # Default: show crew status
+    print("=" * 60)
+    print("AUTONOMOUS CREW BOTS")
     print("=" * 60)
 
-except Exception as e:
-    error(f"Failed to read crew AI: {e}")
-    exit(1)
+    try:
+        # Read crew AI status from procfs
+        ai_fd = kernel.open("/proc/ship/crew_ai", kernel.O_RDONLY)
+        ai_status = kernel.read(ai_fd, 4096).decode('utf-8')
+        kernel.close(ai_fd)
+
+        print(ai_status.strip())
+
+        print()
+        print("Crew bots automatically handle:")
+        print("  - System repairs when damaged")
+        print("  - Fire suppression")
+        print("  - Oxygen level monitoring")
+        print("  - System operation")
+        print()
+        print("To manually assign: crew assign <name> <room>")
+        print("=" * 60)
+
+    except Exception as e:
+        error(f"Failed to read crew AI: {e}")
+        exit(1)

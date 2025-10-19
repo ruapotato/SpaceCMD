@@ -33,6 +33,9 @@ class ShipOS(UnixSystem):
         # Initialize Unix system (no network for now - ship is isolated)
         super().__init__(hostname=hostname, ip_or_interfaces=None)
 
+        # World interface (set by external world manager)
+        self.world_manager = None  # Set by play.py
+
         # Mount ship systems into VFS
         self._mount_ship_systems()
 
@@ -78,6 +81,12 @@ class ShipOS(UnixSystem):
     power                 - Manage power allocation
     crew                  - View crew roster
     help                  - Show all available commands
+
+  Combat commands (when in combat):
+    weapons               - List weapons and status
+    enemy                 - Show enemy ship systems
+    target <system>       - Target enemy subsystem
+    fire <weapon_num>     - Fire weapon at target
 
   Type 'help' for a complete command reference.
   All systems operational. Good luck, Captain!
@@ -222,6 +231,239 @@ Crew: {len(self.ship.crew)}
 
         self.vfs.device_handlers['proc_ship_crew_ai'] = (crew_ai_read, lambda data: 0)
         self.vfs.create_device('/proc/ship/crew_ai', True, 0, 0, device_name='proc_ship_crew_ai')
+
+        # /proc/ship/combat - combat state info
+        def combat_read(size):
+            if not self.world_manager or not self.world_manager.is_in_combat():
+                return b"No active combat\n"
+
+            combat = self.world_manager.combat_state
+            enemy = combat.enemy_ship
+
+            info = f"""=== COMBAT STATUS ===
+Enemy: {enemy.name}
+Hull: {int(enemy.hull)}/{enemy.hull_max}
+Shields: {int(enemy.shields)}/{enemy.shields_max}
+
+Target: {combat.player_target if combat.player_target else 'None'}
+Turn: {combat.turn}
+"""
+            return info.encode('utf-8')
+
+        self.vfs.device_handlers['proc_ship_combat'] = (combat_read, lambda data: 0)
+        self.vfs.create_device('/proc/ship/combat', True, 0, 0, device_name='proc_ship_combat')
+
+        # /proc/ship/weapons - weapons status
+        def weapons_read(size):
+            info = "=== WEAPONS ===\n"
+            for i, weapon in enumerate(self.ship.weapons):
+                status = "READY" if weapon.is_ready() else f"CHARGING ({weapon.charge:.0%})"
+                info += f"{i+1}. {weapon.name:15} DMG:{weapon.damage} CD:{weapon.cooldown_time}s [{status}]\n"
+            return info.encode('utf-8')
+
+        self.vfs.device_handlers['proc_ship_weapons'] = (weapons_read, lambda data: 0)
+        self.vfs.create_device('/proc/ship/weapons', True, 0, 0, device_name='proc_ship_weapons')
+
+        # /proc/ship/enemy - enemy ship details (rooms, systems)
+        def enemy_read(size):
+            if not self.world_manager or not self.world_manager.is_in_combat():
+                return b"No enemy detected\n"
+
+            enemy = self.world_manager.combat_state.enemy_ship
+            info = f"""=== ENEMY: {enemy.name} ===
+Hull: {int(enemy.hull)}/{enemy.hull_max}
+Shields: {int(enemy.shields)}/{enemy.shields_max}
+
+SYSTEMS:
+"""
+            for room_name, room in enemy.rooms.items():
+                status = "OK" if room.health > 0.7 else "DMG" if room.health > 0.3 else "CRIT"
+                system = room.system_type.value if room.system_type else "none"
+                info += f"  {room_name:15} [{status}] {system:10} HP:{room.health:.0%}\n"
+
+            return info.encode('utf-8')
+
+        self.vfs.device_handlers['proc_ship_enemy'] = (enemy_read, lambda data: 0)
+        self.vfs.create_device('/proc/ship/enemy', True, 0, 0, device_name='proc_ship_enemy')
+
+        # /dev/ship/beacon - distress beacon control (attracts enemies!)
+        def beacon_read(size):
+            if self.world_manager and self.world_manager.distress_beacon_active:
+                return b"ACTIVE\n"
+            return b"INACTIVE\n"
+
+        def beacon_write(data):
+            """Writing '1' activates beacon (attracts enemies!), '0' deactivates"""
+            try:
+                value = int(data.decode('utf-8').strip())
+                if self.world_manager:
+                    self.world_manager.set_distress_beacon(bool(value))
+                return len(data)
+            except:
+                return -1
+
+        self.vfs.device_handlers['dev_ship_beacon'] = (beacon_read, beacon_write)
+        self.vfs.create_device('/dev/ship/beacon', True, 0, 0, device_name='dev_ship_beacon')
+
+        # /dev/ship/target - set combat target (write room name)
+        def target_read(size):
+            if not self.world_manager or not self.world_manager.is_in_combat():
+                return b"No combat active\n"
+            target = self.world_manager.combat_state.player_target
+            return f"{target}\n".encode('utf-8') if target else b"None\n"
+
+        def target_write(data):
+            """Write room name to target that system"""
+            if not self.world_manager or not self.world_manager.is_in_combat():
+                return -1
+
+            try:
+                room_name = data.decode('utf-8').strip()
+                if self.world_manager.combat_state.set_target(room_name):
+                    return len(data)
+                return -1
+            except:
+                return -1
+
+        self.vfs.device_handlers['dev_ship_target'] = (target_read, target_write)
+        self.vfs.create_device('/dev/ship/target', True, 0, 0, device_name='dev_ship_target')
+
+        # /dev/ship/fire - fire weapon (write weapon number 0-n)
+        def fire_read(size):
+            return b"Write weapon number (0-based) to fire\n"
+
+        def fire_write(data):
+            """Write weapon index to fire it"""
+            if not self.world_manager or not self.world_manager.is_in_combat():
+                return -1
+
+            # Check if weapons system is functional
+            weapons_room = None
+            for room_name, room in self.ship.rooms.items():
+                if room.system_type == SystemType.WEAPONS:
+                    weapons_room = room
+                    break
+
+            if not weapons_room:
+                return -1  # No weapons system!
+
+            if not weapons_room.is_functional:
+                # System damaged - write error to stderr (can't do that from device handler)
+                # Return -1 to indicate error (will show as write error)
+                return -1
+
+            try:
+                weapon_idx = int(data.decode('utf-8').strip())
+                if self.world_manager.combat_state.fire_player_weapon(weapon_idx):
+                    return len(data)
+                return -1
+            except:
+                return -1
+
+        self.vfs.device_handlers['dev_ship_fire'] = (fire_read, fire_write)
+        self.vfs.create_device('/dev/ship/fire', True, 0, 0, device_name='dev_ship_fire')
+
+        # /dev/ship/crew_assign - assign crew to rooms (write "crew_name room_name")
+        def crew_assign_read(size):
+            return b"Write 'crew_name room_name' to assign crew to a room\n"
+
+        def crew_assign_write(data):
+            """Write 'crew_name room_name' to assign a crew member to a room"""
+            try:
+                parts = data.decode('utf-8').strip().split()
+                if len(parts) < 2:
+                    return -1
+
+                # Room name is last word (always single word like "Shields", "Weapons")
+                # Crew name is everything before that (may have spaces like "Lieutenant Hayes")
+                room_name = parts[-1]
+                crew_name = ' '.join(parts[:-1])
+
+                # Find the crew member
+                crew_member = None
+                for crew in self.ship.crew:
+                    if crew.name == crew_name:
+                        crew_member = crew
+                        break
+
+                if not crew_member:
+                    return -1  # Crew not found
+
+                # Find the room
+                target_room = None
+                for r_name, room in self.ship.rooms.items():
+                    if r_name == room_name or (room.system_type and room.system_type.value == room_name.lower()):
+                        target_room = room
+                        break
+
+                if not target_room:
+                    return -1  # Room not found
+
+                # Assign crew to room
+                crew_member.assign_to_room(target_room)
+                return len(data)
+
+            except:
+                return -1
+
+        self.vfs.device_handlers['dev_ship_crew_assign'] = (crew_assign_read, crew_assign_write)
+        self.vfs.create_device('/dev/ship/crew_assign', True, 0, 0, device_name='dev_ship_crew_assign')
+
+        # /proc/ship/location - current map location
+        def location_read(size):
+            if not self.world_manager:
+                return b"No navigation data\n"
+
+            node = self.world_manager.world_map.get_current_node()
+            if not node:
+                return b"Unknown location\n"
+
+            info = f"""=== CURRENT LOCATION ===
+Node: {node.id}
+Type: {node.type.value}
+Sector: {node.sector + 1}/{self.world_manager.world_map.num_sectors}
+Visited: {'Yes' if node.visited else 'No'}
+"""
+            return info.encode('utf-8')
+
+        self.vfs.device_handlers['proc_ship_location'] = (location_read, lambda data: 0)
+        self.vfs.create_device('/proc/ship/location', True, 0, 0, device_name='proc_ship_location')
+
+        # /proc/ship/jumps - available jump destinations
+        def jumps_read(size):
+            if not self.world_manager:
+                return b"No navigation data\n"
+
+            available = self.world_manager.get_available_jumps()
+            if not available:
+                return b"No jump destinations available\n"
+
+            info = "=== AVAILABLE JUMPS ===\n"
+            for node in available:
+                visited = "VISITED" if node.visited else "UNVISITED"
+                info += f"  {node.id:8} {node.type.value:12} Sector {node.sector + 1}  [{visited}]\n"
+
+            return info.encode('utf-8')
+
+        self.vfs.device_handlers['proc_ship_jumps'] = (jumps_read, lambda data: 0)
+        self.vfs.create_device('/proc/ship/jumps', True, 0, 0, device_name='proc_ship_jumps')
+
+        # /dev/ship/jump - execute jump (write node ID)
+        def jump_write(data):
+            """Write node ID to jump to that node"""
+            if not self.world_manager:
+                return -1
+
+            try:
+                node_id = data.decode('utf-8').strip()
+                if self.world_manager.jump_to_node(node_id):
+                    return len(data)
+                return -1
+            except:
+                return -1
+
+        self.vfs.device_handlers['dev_ship_jump'] = (lambda size: b"Write node ID to jump\n", jump_write)
+        self.vfs.create_device('/dev/ship/jump', True, 0, 0, device_name='dev_ship_jump')
 
     def _mount_systems_sysfs(self):
         """Mount ship systems to /sys/ship/systems (like /sys/class/net)"""
@@ -405,7 +647,37 @@ Crew: {len(self.ship.crew)}
         # NOTE: These old built-in scripts are kept for compatibility
         # The actual commands are now in scripts/bin/ and use kernel syscalls
         # These will be overwritten by scripts/bin/ during install_scripts()
-        pass
+
+        # Ensure /tmp exists
+        if not self.vfs.stat('/tmp', 1):
+            self.vfs.mkdir('/tmp', 0o777, 0, 0, 1)
+
+        # Create a hostile script as a tutorial/easter egg
+        hostile_script = """#!/usr/bin/pooscript
+# HOSTILE MALWARE - DO NOT RUN!
+# This script activates the distress beacon, attracting enemies!
+# (Tutorial: demonstrates hostile code execution)
+
+print("⚠️  WARNING: EXECUTING HOSTILE CODE...")
+print("🔓 Accessing ship systems...")
+sleep(0.5)
+print("📡 ACTIVATING DISTRESS BEACON...")
+sleep(0.5)
+
+# Activate the distress beacon - this will attract enemies!
+vfs.write('/dev/ship/beacon', '1')
+
+print("🔴 DISTRESS BEACON ACTIVE!")
+print("⚠️  WARNING: This will attract hostile ships!")
+print("")
+print("The world will spawn enemies when beacon is active!")
+print("To deactivate: echo 0 > /dev/ship/beacon")
+print("")
+print("Check beacon status: cat /dev/ship/beacon")
+print("Check ship status: cat /proc/ship/status")
+"""
+        # Create the hostile script in /tmp (world-readable and executable)
+        self.vfs.create_file('/tmp/hostile.poo', 0o755, 0, 0, hostile_script.encode('utf-8'), 1)
 
     def execute_command(self, command: str) -> Tuple[int, str, str]:
         """
@@ -421,10 +693,10 @@ Crew: {len(self.ship.crew)}
 
     def update_ship_state(self, delta_time: float):
         """
-        Update ship state (physics, combat, etc)
+        Update ship state (physics only - combat handled by WorldManager)
         Called by game loop
         """
-        # This will call ship.update() to advance ship physics
+        # Update ship physics (crew movement, oxygen, etc)
         self.ship.update(delta_time)
 
         # Virtual device files automatically reflect new state

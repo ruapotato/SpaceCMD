@@ -1,0 +1,31 @@
+#!/usr/bin/pooscript
+# Display current location and available jumps
+
+print("="*60)
+print("NAVIGATION MAP")
+print("="*60)
+print("")
+
+# Show current location
+try:
+    fd = kernel.open("/proc/ship/location", kernel.O_RDONLY)
+    location_info = kernel.read(fd, 4096).decode('utf-8')
+    kernel.close(fd)
+    print(location_info.strip())
+except Exception as e:
+    error(f"Failed to read location: {e}")
+
+print("")
+
+# Show available jumps
+try:
+    fd = kernel.open("/proc/ship/jumps", kernel.O_RDONLY)
+    jumps_info = kernel.read(fd, 4096).decode('utf-8')
+    kernel.close(fd)
+    print(jumps_info.strip())
+except Exception as e:
+    error(f"Failed to read jumps: {e}")
+
+print("")
+print("Use 'jump <node_id>' to navigate to a new location")
+print("="*60)
