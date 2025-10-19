@@ -273,8 +273,6 @@ class TerminalWidget:
                 # Force cursor to be visible when typing
                 self.cursor_visible = True
                 self.cursor_blink_time = 0
-                # Debug output
-                print(f"DEBUG: Typed '{event.unicode}' - input_line: '{self.input_line}' - cursor_pos: {self.cursor_pos}")
                 return True
 
         # Scroll wheel
@@ -352,12 +350,8 @@ class TerminalWidget:
                 self.surface.blit(text_surface, (4, y))
                 y += self.char_height
 
-        # Fill remaining space to ensure input is always at bottom
-        while y < self.height - self.char_height - 8:
-            y += self.char_height
-
-        # Render input line at bottom (always visible, always at same position)
-        input_y = self.height - self.char_height - 4
+        # Render input line right after buffer content
+        input_y = y
 
         # Draw a subtle background for the input line to make it stand out
         input_bg_rect = pygame.Rect(0, input_y - 2, self.width, self.char_height + 6)
@@ -391,11 +385,10 @@ class TerminalWidget:
                 cursor_offset = self.cursor_pos
 
         # ALWAYS render the input text (even if empty string)
-        if visible_input:  # Debug: only render if there's text
-            print(f"RENDER DEBUG: Rendering '{visible_input}' at y={input_y}, prompt_width={prompt_width}")
-            # Draw a bright background behind the text to make it VERY visible
+        if visible_input:
+            # Draw a subtle background behind the text to make it visible
             text_bg_width = len(visible_input) * self.char_width if self.char_width > 0 else len(visible_input) * 8
-            pygame.draw.rect(self.surface, (50, 50, 80),
+            pygame.draw.rect(self.surface, (25, 25, 50),
                            (4 + prompt_width, input_y, text_bg_width, self.char_height))
 
         input_surface = Theme.FONT_TERMINAL.render(visible_input, True, TERMINAL_FG)
