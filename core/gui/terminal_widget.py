@@ -319,26 +319,27 @@ class TerminalWidget:
         if not Theme.FONT_TERMINAL:
             return self.surface
 
-        # Calculate visible lines (reserve space for input at bottom)
-        visible_lines = self.rows - 1  # Reserve one line for input
-
-        # Input line is ALWAYS at the bottom
-        input_y = self.height - self.char_height - 4
-
         # Get buffer content
         total_lines = len(self.buffer)
 
-        # Calculate which buffer lines to show (fill space above input)
+        # When scrolled back, don't show input line (we're viewing history)
+        # When at bottom (scroll_offset == 0), show input inline after content
+        show_input = (self.scroll_offset == 0)
+
+        # Calculate visible lines
+        max_visible_lines = self.rows if show_input else self.rows - 1
+
+        # Calculate which buffer lines to show
         if self.scroll_offset == 0:
-            # Show most recent lines (bottom of buffer)
-            start_line = max(0, total_lines - visible_lines)
+            # At bottom - show most recent lines
+            start_line = max(0, total_lines - max_visible_lines)
             end_line = total_lines
         else:
             # Scrolled back - show older lines
-            start_line = max(0, total_lines - visible_lines - self.scroll_offset)
+            start_line = max(0, total_lines - max_visible_lines - self.scroll_offset)
             end_line = max(0, total_lines - self.scroll_offset)
 
-        # Render buffer lines (fills space above input)
+        # Render buffer lines
         y = 0
         for i in range(start_line, end_line):
             if i < len(self.buffer):
@@ -351,6 +352,13 @@ class TerminalWidget:
                 text_surface = Theme.FONT_TERMINAL.render(line, True, TERMINAL_FG)
                 self.surface.blit(text_surface, (4, y))
                 y += self.char_height
+
+        # Only render input if we're at the bottom (not scrolled back)
+        if not show_input:
+            return self.surface
+
+        # Render input line right after buffer content (inline)
+        input_y = y
 
         # Draw a subtle background for the input line to make it stand out
         input_bg_rect = pygame.Rect(0, input_y - 2, self.width, self.char_height + 6)
