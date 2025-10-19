@@ -94,8 +94,7 @@ class Room:
         """Can this room's system operate?"""
         return (self.health > 0.2 and  # Systems work until they're severely damaged (< 20%)
                 self.power_allocated > 0 and
-                not self.breached and
-                len(self.crew) > 0)  # Need crew to operate most systems
+                not self.breached)  # Systems work without crew, but poorly
 
     @property
     def crew_bonus(self) -> float:
@@ -157,16 +156,26 @@ class ShipSystem:
     def get_effectiveness(self) -> float:
         """
         How effective is this system? (0.0 to 1.0+)
-        Affected by power, health, crew skill
+        Affected by power, health, and crew.
+
+        - Without crew: 25% base effectiveness (automated systems)
+        - With 1+ crew: 100% effectiveness + crew bonuses
+        - Crew skills provide additional bonuses
         """
         if not self.is_online():
             return 0.0
 
-        base = self.room.health
-        crew_bonus = self.room.crew_bonus
+        health_factor = self.room.health
         power_ratio = self.room.power_allocated / self.room.max_power
 
-        return base * power_ratio * (1.0 + crew_bonus)
+        # Base effectiveness without crew (automated systems at 25%)
+        if not self.room.crew:
+            # Low base rate: 25% effectiveness without crew
+            return health_factor * power_ratio * 0.25
+
+        # With crew: full effectiveness + bonuses
+        crew_bonus = self.room.crew_bonus
+        return health_factor * power_ratio * (1.0 + crew_bonus)
 
 
 class Ship:
