@@ -1,0 +1,54 @@
+#!/usr/bin/pooscript
+# Network scan enemy ship for vulnerabilities
+
+# Check if in combat
+try:
+    fd = kernel.open("/proc/ship/combat", kernel.O_RDONLY)
+    combat_info = kernel.read(fd, 4096).decode('utf-8')
+    kernel.close(fd)
+
+    if "No combat active" in combat_info:
+        error("Not in combat! Nothing to scan.")
+        exit(1)
+except Exception as e:
+    error(f"Failed to check combat status: {e}")
+    exit(1)
+
+# Perform network scan
+print("🔍 Initiating network scan of enemy ship...")
+print("")
+print("NMAP SCAN RESULTS:")
+print("=" * 60)
+print("PORT     STATE   SERVICE       VERSION")
+print("22/tcp   open    ssh           OpenSSH 7.4")
+print("80/tcp   open    http          Apache/2.4.6")
+print("443/tcp  open    https         Apache/2.4.6")
+print("3306/tcp open    mysql         MySQL 5.7.22")
+print("8080/tcp open    http-proxy    Squid 3.5.20")
+print("=" * 60)
+print("")
+
+# Read actual scan results from /dev/ship/scan device
+try:
+    fd = kernel.open("/dev/ship/scan", kernel.O_RDONLY)
+    scan_results = kernel.read(fd, 4096).decode('utf-8')
+    kernel.close(fd)
+
+    print("VULNERABILITIES DETECTED:")
+    print(scan_results)
+    print("")
+    print("💡 TIP: Use 'hack <exploit_type> <system>' to exploit vulnerabilities")
+    print("   Available exploits: buffer_overflow, sql_injection, backdoor, dos")
+    print("")
+
+except Exception as e:
+    # Fallback if /dev/ship/scan doesn't exist yet
+    print("VULNERABILITIES DETECTED:")
+    print("  [HIGH] Unpatched buffer overflow in weapons controller")
+    print("  [MED]  Weak SSH credentials on admin account")
+    print("  [LOW]  Outdated firewall rules")
+    print("")
+    print("💡 TIP: Use 'hack <exploit_type> <system>' to exploit these")
+    print("")
+
+exit(0)

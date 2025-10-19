@@ -1,52 +1,40 @@
 #!/usr/bin/pooscript
-# Hacker's toolkit - edit and modify any command!
+# Hack enemy ship systems
 
 if len(args) < 1:
-    print("=" * 60)
-    print("HACKER'S TOOLKIT")
-    print("=" * 60)
-    print()
-    print("This is PooScript OS - EVERYTHING is hackable!")
-    print()
-    print("Usage: hack <command_name>")
-    print()
-    print("View any command's source:")
-    print("  hack status     - See how status works")
-    print("  hack power      - See how power allocation works")
-    print("  hack ls         - See how ls is implemented")
-    print()
-    print("All commands are in /bin/ as PooScript files.")
-    print("Read them with: cat /bin/<command>")
-    print()
-    print("Tips:")
-    print("  - Every command is a PooScript you can read")
-    print("  - Ship state is in /ship/, /systems/, /crew/, /rooms/")
-    print("  - Use kernel.open/read/write for low-level access")
-    print("  - Modify commands to add features or exploits!")
-    print("=" * 60)
-    exit(0)
-
-command = args[0]
-
-# Find the command
-command_path = f"/bin/{command}"
-
-try:
-    # Read command source via kernel
-    fd = kernel.open(command_path, kernel.O_RDONLY)
-    source = kernel.read(fd, 65536).decode('utf-8')
-    kernel.close(fd)
-
-    print("=" * 60)
-    print(f"SOURCE: {command_path}")
-    print("=" * 60)
-    print(source)
-    print("=" * 60)
-    print()
-    print(f"HACK IT: This is the actual source of '{command}'")
-    print(f"In a real game, you could modify this to change behavior!")
-
-except Exception as e:
-    error(f"Command not found: {command}")
-    error(f"Try: ls /bin")
+    error("Usage: hack <exploit_type> [target_system]")
+    print("")
+    print("Available exploits:")
+    print("  buffer_overflow  - Crash target system")
+    print("  sql_injection    - Access database/logs")
+    print("  backdoor         - Persistent access")
+    print("  dos              - Denial of service attack")
+    print("  zero_day         - Unknown exploit (high success rate)")
+    print("")
+    print("Target systems: weapons, shields, engines, reactor")
+    print("")
+    print("Examples:")
+    print("  hack buffer_overflow weapons")
+    print("  hack backdoor")
+    print("  hack dos shields")
     exit(1)
+
+exploit_type = args[0]
+target_system = args[1] if len(args) > 1 else "None"
+
+print(f"🔓 Initiating {exploit_type} attack...")
+if target_system != "None":
+    print(f"   Targeting: {target_system}")
+print("")
+print("⚡ HACKING SIMULATION")
+print(f"   Exploiting {exploit_type}...")
+print(f"   Target: {target_system}")
+print("")
+print("⏳ Hack in progress...")
+print("   [██████████░░░░░░░░░░] 50%")
+print("")
+print("💡 TIP: Hacking takes time. Use 'hacks' to see progress.")
+print("   Successful hacks grant system access or disable enemy systems!")
+print("")
+
+exit(0)

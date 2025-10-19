@@ -1,0 +1,73 @@
+#!/usr/bin/pooscript
+# Example: Take manual control of hacked ship
+# Use this to control enemy weapons, shields, etc.
+
+print("🎮 REMOTE SHIP CONTROL")
+print("")
+
+# Verify access
+try:
+    fd = kernel.open("/tmp/.virus_weapons", kernel.O_RDONLY)
+    kernel.close(fd)
+    print("✓ Access verified")
+except:
+    print("✗ No access! Deploy malware first:")
+    print("  upload-malware virus")
+    exit(1)
+
+print("")
+print("Available commands:")
+print("  1. Disable enemy weapons")
+print("  2. Drop enemy shields")
+print("  3. Disable engines (prevent escape)")
+print("  4. Monitor ship status")
+print("")
+
+# Get user choice (in real game, this would be interactive)
+choice = args[0] if len(args) > 0 else "1"
+
+if choice == "1":
+    print("🔫 Disabling enemy weapons...")
+    try:
+        fd = kernel.open("/sys/ship/systems/weapons/power", kernel.O_WRONLY)
+        kernel.write(fd, b"0")
+        kernel.close(fd)
+        print("   ✓ Enemy weapons OFFLINE")
+    except Exception as e:
+        print(f"   ✗ Failed: {e}")
+
+elif choice == "2":
+    print("🛡️  Dropping enemy shields...")
+    try:
+        fd = kernel.open("/sys/ship/systems/shields/power", kernel.O_WRONLY)
+        kernel.write(fd, b"0")
+        kernel.close(fd)
+        print("   ✓ Enemy shields DOWN")
+    except Exception as e:
+        print(f"   ✗ Failed: {e}")
+
+elif choice == "3":
+    print("🚀 Disabling engines...")
+    try:
+        fd = kernel.open("/sys/ship/systems/engines/power", kernel.O_WRONLY)
+        kernel.write(fd, b"0")
+        kernel.close(fd)
+        print("   ✓ Enemy engines OFFLINE (cannot escape)")
+    except Exception as e:
+        print(f"   ✗ Failed: {e}")
+
+elif choice == "4":
+    print("📊 Ship status:")
+    try:
+        fd = kernel.open("/proc/ship/status", kernel.O_RDONLY)
+        status = kernel.read(fd, 4096).decode('utf-8')
+        kernel.close(fd)
+        print(status)
+    except Exception as e:
+        print(f"   ✗ Failed: {e}")
+
+print("")
+print("💡 You have full control!")
+print("   Modify any system file as needed")
+
+exit(0)

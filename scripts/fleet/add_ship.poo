@@ -1,0 +1,47 @@
+#!/usr/bin/pooscript
+# EXAMPLE: Make hacked ship follow your ship
+# This is just an example - write your own automation!
+
+import time
+
+print("🚀 EXAMPLE: Auto-Follow Script")
+print("")
+print("This makes the hacked ship follow your position")
+print("and attack what you attack.")
+print("")
+
+# Verify we have access
+try:
+    fd = kernel.open("/proc/ship/status", kernel.O_RDONLY)
+    status = kernel.read(fd, 1024).decode('utf-8')
+    kernel.close(fd)
+    print("✓ Ship access confirmed")
+except:
+    print("✗ No access! Deploy malware first")
+    exit(1)
+
+print("")
+print("🔁 Starting follow loop...")
+print("   (Press Ctrl+C to stop)")
+print("")
+
+# Simple follow AI loop
+while True:
+    try:
+        # Read your ship's position from shared file
+        # (In real game, you'd write your position to a shared location)
+        fd = kernel.open("/tmp/player_position", kernel.O_RDONLY)
+        player_pos = kernel.read(fd, 64).decode('utf-8')
+        kernel.close(fd)
+
+        # Move this ship to follow
+        # (This is simplified - real implementation would update galaxy_position)
+        print(f"   Following player at {player_pos}")
+
+    except:
+        # Player position not available yet
+        pass
+
+    time.sleep(2)
+
+exit(0)

@@ -246,11 +246,14 @@ def main():
                         help='Use pure CLI mode (for debugging)')
     parser.add_argument('--gui', action='store_true',
                         help='Use GUI desktop environment (default)')
+    parser.add_argument('--console', action='store_true',
+                        help='Use simple console mode (no fancy UI, just text)')
 
     args = parser.parse_args()
 
     # Determine mode (default to GUI unless --no-gui specified)
     use_gui = not args.no_gui
+    use_simple_console = args.console
 
     # Choose ship
     if args.ship:
@@ -303,8 +306,8 @@ def main():
             print(f"ERROR: Failed to initialize ship: {e}")
             sys.exit(1)
 
-        # Create game
-        game = Game(ship)
+        # Create game (use simple console mode if requested)
+        game = Game(ship, use_terminal_ui=not use_simple_console, enable_world=True)
 
         # Run game loop
         try:

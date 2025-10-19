@@ -2,11 +2,13 @@
 spacecmd - Combat Engine
 
 Turn-based combat system for ship-to-ship battles.
+Now with HACKING - network-based combat!
 """
 
 from typing import Optional, List
 from .ship import Ship, Room, SystemType
 from .weapons import Weapon
+from .hacking import HackingSystem, ExploitType, MalwareType
 import random
 
 # Import sound effects (optional - will work without sounds)
@@ -41,6 +43,11 @@ class CombatState:
 
         # Combat log - MUST INITIALIZE FIRST!
         self.log: List[str] = []
+
+        # HACKING SYSTEM - Network-based combat!
+        self.hacking = HackingSystem()
+        self.player_has_root_access = False  # Did player hack into enemy?
+        self.enemy_has_root_access = False   # Did enemy hack into player?
 
         # Galaxy positions (actual positions in galaxy)
         # Enemy spawns at a distance, player can warp away to escape
@@ -107,6 +114,11 @@ class CombatState:
         # Active combat - update both ships
         self.player_ship.update(dt)
         self.enemy_ship.update(dt)
+
+        # Update hacking system (network combat!)
+        hack_messages = self.hacking.update(dt)
+        for msg in hack_messages:
+            self.log_event(msg)
 
         # Enemy AI
         self._enemy_ai(dt)

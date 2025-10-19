@@ -1,0 +1,43 @@
+#!/usr/bin/pooscript
+# Real network scanner using NMAP-style output
+
+print("Starting Nmap 7.80 ( https://nmap.org )")
+print("")
+
+# Get enemy info from combat
+try:
+    fd = kernel.open("/proc/ship/enemy", kernel.O_RDONLY)
+    enemy_info = kernel.read(fd, 4096).decode('utf-8')
+    kernel.close(fd)
+
+    if "No combat active" in enemy_info:
+        error("No target! Must be in combat to scan.")
+        exit(1)
+except:
+    error("Failed to get enemy info")
+    exit(1)
+
+# Simulate real NMAP scan
+print("Nmap scan report for enemy-ship.local (192.168.42.100)")
+print("Host is up (0.0012s latency).")
+print("")
+print("PORT     STATE SERVICE    VERSION")
+print("22/tcp   open  ssh        OpenSSH 7.4 (ShipOS 1.0)")
+print("80/tcp   open  http       Apache httpd 2.4.6")
+print("443/tcp  open  ssl/http   Apache httpd 2.4.6")
+print("3306/tcp open  mysql      MySQL 5.7.22-log")
+print("8080/tcp open  http-proxy Squid http proxy 3.5.20")
+print("")
+print("OS fingerprint:")
+print("  Running: ShipOS 1.0")
+print("  OS CPE: cpe:/o:shipos:shipos:1.0")
+print("  Aggressive OS guesses: ShipOS 1.0 (95%)")
+print("")
+print("Service detection performed. Please report any incorrect results.")
+print("Nmap done: 1 IP address (1 host up) scanned in 2.54 seconds")
+print("")
+print("💡 TIP: Use 'exploit' command to attack these services")
+print("   Try: exploit ssh-bruteforce")
+print("   Try: exploit buffer-overflow weapons")
+
+exit(0)

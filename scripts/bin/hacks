@@ -1,0 +1,29 @@
+#!/usr/bin/pooscript
+# Show active hacks and malware status
+
+print("╔════════════════════════════════════════════════════════════╗")
+print("║              ACTIVE NETWORK OPERATIONS                     ║")
+print("╚════════════════════════════════════════════════════════════╝")
+print("")
+
+print("ACTIVE HACKS:")
+print("  1. buffer_overflow  [██████████░░░░░░░░░░] 50%  (weapons)")
+print("  2. backdoor         [████████████████░░░░] 80%  (reactor)")
+print("")
+
+print("DEPLOYED MALWARE:")
+print("  1. worm            on Hostile Gnat        [ACTIVE]")
+print("  2. logic_bomb      on Hostile Gnat        [ARMED]")
+print("")
+
+print("ROOT ACCESS:")
+print("  Enemy Ship: ✗ NO ACCESS")
+print("  Backdoors:  2 planted")
+print("")
+
+print("💡 Successful hacks grant system access.")
+print("   Malware damages systems over time.")
+print("   Use 'hack' and 'malware' commands to deploy more!")
+print("")
+
+exit(0)

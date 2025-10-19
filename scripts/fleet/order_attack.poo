@@ -1,0 +1,43 @@
+#!/usr/bin/pooscript
+# EXAMPLE: Simple AI to make ship auto-attack enemies
+# Customize this however you want!
+
+import time
+
+print("🎯 EXAMPLE: Auto-Attack AI")
+print("")
+print("This makes the ship automatically attack enemies.")
+print("Modify this script to create your own combat AI!")
+print("")
+
+# Main combat loop
+while True:
+    try:
+        # Check if there's an enemy
+        fd = kernel.open("/proc/ship/enemy", kernel.O_RDONLY)
+        enemy_data = kernel.read(fd, 1024).decode('utf-8')
+        kernel.close(fd)
+
+        if "No combat" in enemy_data:
+            print("   No enemy detected, waiting...")
+            time.sleep(2)
+            continue
+
+        print("   Enemy detected! Engaging...")
+
+        # Fire weapons if ready
+        fd = kernel.open("/proc/ship/weapons", kernel.O_RDONLY)
+        weapons = kernel.read(fd, 1024).decode('utf-8')
+        kernel.close(fd)
+
+        if "READY" in weapons:
+            # Fire weapon 1
+            print("   🔫 Firing!")
+            # (In real game would call: fire 1)
+
+    except Exception as e:
+        print(f"   Error: {e}")
+
+    time.sleep(1.5)
+
+exit(0)

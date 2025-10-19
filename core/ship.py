@@ -269,6 +269,19 @@ class Ship:
         self.base_speed = 0.8  # Base travel speed without engines (units per second) - 20 min to cross galaxy
         self.max_speed = 1.5  # Maximum travel speed with engines+crew (units per second) - 11 min to cross galaxy
         # With engines but NO crew (25% effectiveness): 0.975 u/s - 17 min to cross galaxy
+
+        # NETWORK CONFIGURATION (for real hacking!)
+        self.network_address = None  # Will be assigned (192.168.x.x)
+        self.network_ports = {
+            22: "ssh",      # SSH server
+            80: "http",     # Web server
+            443: "https",   # Secure web
+            3306: "mysql",  # Database
+            8080: "proxy",  # HTTP proxy
+        }
+        self.firewall_enabled = True
+        self.ssh_password = "root"  # Weak default password!
+        self.root_password = "root"  # For hacking!
         # CREW IN ENGINES IS CRITICAL for fast travel!
 
         # Legacy compatibility (remove eventually)

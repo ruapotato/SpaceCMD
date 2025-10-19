@@ -1,0 +1,68 @@
+#!/usr/bin/pooscript
+# SSH into enemy ship - real remote shell!
+
+if len(args) < 1:
+    print("Usage: ssh-enemy <username>")
+    print("")
+    print("SSH into enemy ship to execute commands remotely!")
+    print("")
+    print("Try:")
+    print("  ssh-enemy root       # Try default password")
+    print("  ssh-enemy hacker     # After installing backdoor")
+    exit(1)
+
+username = args[0]
+
+print(f"🔐 SSH Connection to enemy-ship.local")
+print(f"   User: {username}")
+print("")
+
+# Simulate SSH connection
+print("Connecting to 192.168.42.100:22...")
+print("The authenticity of host '192.168.42.100' can't be established.")
+print("ED25519 key fingerprint is SHA256:+xK7Hd3v...")
+print("Are you sure you want to continue connecting (yes/no)? yes")
+print("")
+
+if username == "root":
+    print(f"{username}@192.168.42.100's password: ")
+    print("⏳ Trying default password 'root'...")
+    print("")
+    print("✓ Access granted!")
+    print("")
+    print("Last login: Mon Oct 19 12:34:56 from 192.168.42.1")
+    print("")
+    print("enemy-ship:~# ")
+    print("")
+    print("💡 You now have ROOT ACCESS to enemy ship!")
+    print("   You can execute ANY command on their ShipOS!")
+    print("")
+    print("Try these commands:")
+    print("  ls /sys/ship/systems       # List their systems")
+    print("  cat /ship/hull             # Check their hull")
+    print("  echo 0 > /sys/ship/systems/weapons/power  # Disable weapons!")
+    print("  pooscript /tmp/malware.poo # Run malware")
+
+elif username == "hacker":
+    print(f"{username}@192.168.42.100's password: ")
+    print("⏳ Using backdoor credentials...")
+    print("")
+    print("✓ Backdoor access successful!")
+    print("")
+    print("enemy-ship:~$ sudo -i")
+    print("enemy-ship:~# ")
+    print("")
+    print("🚪 BACKDOOR ACCESS - You're root now!")
+
+else:
+    print(f"{username}@192.168.42.100's password: ")
+    print("Permission denied, please try again.")
+    print("")
+    error("Access denied - wrong credentials")
+    exit(1)
+
+print("")
+print("💻 You are now inside the enemy ship's operating system!")
+print("   Use regular commands - they execute on THEIR system")
+
+exit(0)

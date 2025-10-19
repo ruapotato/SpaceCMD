@@ -1,0 +1,86 @@
+#!/usr/bin/pooscript
+# List all ships we have compromised/hacked
+# Shows which ships we can remote into
+
+print("🏴‍☠️ COMPROMISED SHIPS")
+print("=" * 60)
+print("")
+
+# Check for access markers from malware/exploits
+# These would be stored in a registry by the game
+
+hacked_ships = []
+
+# Look for backdoor markers in /tmp
+# (In real implementation, game would track this globally)
+try:
+    # Check for worm access
+    fd = kernel.open("/tmp/.worm_access", kernel.O_RDONLY)
+    kernel.close(fd)
+    hacked_ships.append({
+        'name': 'Enemy Ship',
+        'ip': '192.168.42.100',
+        'access': 'worm',
+        'status': 'COMPROMISED'
+    })
+except:
+    pass
+
+try:
+    # Check for rootkit access
+    fd = kernel.open("/tmp/.rootkit_user", kernel.O_RDONLY)
+    kernel.close(fd)
+    if len(hacked_ships) == 0:
+        hacked_ships.append({
+            'name': 'Enemy Ship',
+            'ip': '192.168.42.100',
+            'access': 'rootkit',
+            'status': 'COMPROMISED'
+        })
+except:
+    pass
+
+if len(hacked_ships) == 0:
+    print("No compromised ships found.")
+    print("")
+    print("💡 To hack a ship:")
+    print("   1. scan               # Find vulnerabilities")
+    print("   2. exploit <type>     # Gain access")
+    print("   3. upload-malware     # Deploy backdoor")
+    print("   4. hacked-ships       # See access list")
+    exit(0)
+
+print(f"Total hacked ships: {len(hacked_ships)}")
+print("")
+
+for i, ship in enumerate(hacked_ships):
+    print(f"{i+1}. {ship['name']}")
+    print(f"   IP Address:  {ship['ip']}")
+    print(f"   Access:      {ship['access']}")
+    print(f"   Status:      {ship['status']}")
+    print("")
+    print(f"   Connect:     ssh-enemy root")
+    print(f"   Control:     pooscript /scripts/examples/control_hacked_ship.poo")
+    print(f"   Destroy:     pooscript /scripts/examples/destroy_hacked_ship.poo")
+    print("")
+
+print("=" * 60)
+print("")
+print("💡 WHAT YOU CAN DO:")
+print("")
+print("   [1] Remote into ship:")
+print("       ssh-enemy root")
+print("       # Now you're inside their system!")
+print("")
+print("   [2] Make them fight for you:")
+print("       # Write a simple AI script")
+print("       pooscript /scripts/examples/control_hacked_ship.poo")
+print("")
+print("   [3] Build a fleet:")
+print("       # Make ship follow and attack with you")
+print("       # See: /scripts/fleet/ for examples")
+print("")
+print("   [4] Destroy them:")
+print("       pooscript /scripts/examples/destroy_hacked_ship.poo")
+
+exit(0)

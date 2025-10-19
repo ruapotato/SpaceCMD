@@ -1,0 +1,53 @@
+#!/usr/bin/pooscript
+# Example: Destroy a hacked ship
+# Run this AFTER gaining access via malware
+
+print("💥 DESTROYING COMPROMISED SHIP")
+print("")
+
+# Verify access
+try:
+    fd = kernel.open("/tmp/.worm_access", kernel.O_RDONLY)
+    kernel.close(fd)
+    print("✓ Access verified (worm backdoor detected)")
+except:
+    print("✗ No access! Deploy malware first:")
+    print("  upload-malware worm")
+    exit(1)
+
+print("")
+print("⚔️  Initiating destruction sequence...")
+print("")
+
+# Destroy all critical systems
+systems = ["weapons", "shields", "engines", "reactor"]
+destroyed = 0
+
+for system in systems:
+    health_path = f"/sys/ship/systems/{system}/health"
+    try:
+        # Set health to 0
+        fd = kernel.open(health_path, kernel.O_WRONLY)
+        kernel.write(fd, b"0")
+        kernel.close(fd)
+
+        # Set power to 0
+        power_path = f"/sys/ship/systems/{system}/power"
+        fd = kernel.open(power_path, kernel.O_WRONLY)
+        kernel.write(fd, b"0")
+        kernel.close(fd)
+
+        destroyed += 1
+        print(f"💥 {system.upper()} - DESTROYED")
+    except Exception as e:
+        print(f"✗ {system} - Failed: {e}")
+
+print("")
+if destroyed == len(systems):
+    print("✅ SHIP DESTROYED")
+    print("   All critical systems offline")
+    print("   Ship is disabled and drifting")
+else:
+    print(f"⚠️  PARTIAL DESTRUCTION ({destroyed}/{len(systems)} systems)")
+
+exit(0)

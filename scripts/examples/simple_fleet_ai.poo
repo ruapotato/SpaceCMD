@@ -1,0 +1,75 @@
+#!/usr/bin/pooscript
+# SIMPLE FLEET AI EXAMPLE
+# Makes a hacked ship act as your wingman
+
+import time
+
+print("🚀 SIMPLE FLEET AI")
+print("=" * 60)
+print("")
+print("This script makes the hacked ship:")
+print("  • Follow your ship")
+print("  • Attack enemies automatically")
+print("  • Defend you when shields are low")
+print("")
+print("Customize this to make your own fleet behavior!")
+print("")
+
+# Check we have access
+try:
+    fd = kernel.open("/proc/ship/status", kernel.O_RDONLY)
+    kernel.close(fd)
+except:
+    error("No access to this ship!")
+    exit(1)
+
+print("✓ Ship access confirmed")
+print("🔁 Starting AI loop...")
+print("")
+
+# Main AI loop
+turn = 0
+while True:
+    turn += 1
+    print(f"[Turn {turn}]")
+
+    # [1] Check for enemies
+    try:
+        fd = kernel.open("/proc/ship/enemy", kernel.O_RDONLY)
+        enemy = kernel.read(fd, 2048).decode('utf-8')
+        kernel.close(fd)
+
+        if "No combat" not in enemy:
+            print("  🎯 Enemy detected - engaging!")
+
+            # Check if weapons ready
+            fd = kernel.open("/proc/ship/weapons", kernel.O_RDONLY)
+            weapons = kernel.read(fd, 1024).decode('utf-8')
+            kernel.close(fd)
+
+            if "READY" in weapons:
+                print("  🔫 Firing weapons!")
+                # Execute fire command
+                # os.system("fire 1")
+        else:
+            print("  ✓ No enemies, standing by")
+
+    except Exception as e:
+        print(f"  ✗ Error: {e}")
+
+    # [2] Check our health
+    try:
+        fd = kernel.open("/proc/ship/status", kernel.O_RDONLY)
+        status = kernel.read(fd, 1024).decode('utf-8')
+        kernel.close(fd)
+
+        # If hull < 50%, be more defensive
+        # (Parse status to check hull percentage)
+
+    except:
+        pass
+
+    print("")
+    time.sleep(2)
+
+exit(0)
