@@ -62,6 +62,9 @@ def run_gui_mode(ship_type=None):
     # Wire up attack callback to desktop flash effect
     world_manager.on_attack_callback = desktop.trigger_attack_flash
 
+    # Wire up jump callback to desktop jump animation
+    world_manager.on_jump_complete = lambda node: desktop.trigger_jump_animation()
+
     # For tutorial: spawn a gnat immediately after 5 seconds
     def tutorial_encounter():
         """Spawn tutorial enemy after delay"""

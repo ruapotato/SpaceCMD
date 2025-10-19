@@ -197,6 +197,12 @@ class Desktop:
         self.attack_flash = 0.0  # 0.0 = no flash, 1.0 = full red flash
         self.attack_flash_color = (255, 0, 0)  # Red for damage
 
+        # Jump animation state
+        self.jump_animation_active = False
+        self.jump_animation_time = 0.0
+        self.jump_animation_duration = 2.0  # 2 second jump animation
+        self.base_warp_speed = 0.5  # Normal background star movement
+
     def _create_starfield(self, count):
         """Create starfield with random stars"""
         stars = []
@@ -457,6 +463,16 @@ class Desktop:
         self.attack_flash = max(self.attack_flash, intensity)
         self.attack_flash_color = color
 
+    def trigger_jump_animation(self):
+        """
+        Trigger FTL jump animation with accelerating stars.
+        Stars will accelerate to warp speed and then decelerate.
+        """
+        self.jump_animation_active = True
+        self.jump_animation_time = 0.0
+        print("\n🚀 ENGAGING FTL DRIVE...")
+        print("   Stars accelerating...")
+
     def update(self, dt):
         """
         Update desktop state.
@@ -464,6 +480,30 @@ class Desktop:
         Args:
             dt: Delta time in seconds
         """
+        # Update jump animation
+        if self.jump_animation_active:
+            self.jump_animation_time += dt
+
+            # Animation curve: accelerate, hold, decelerate
+            progress = self.jump_animation_time / self.jump_animation_duration
+
+            if progress < 0.3:
+                # Accelerate phase (0 to 0.3)
+                accel_progress = progress / 0.3
+                self.warp_speed = self.base_warp_speed + (accel_progress ** 2) * 15.0
+            elif progress < 0.7:
+                # Hold at maximum speed (0.3 to 0.7)
+                self.warp_speed = self.base_warp_speed + 15.0
+            elif progress < 1.0:
+                # Decelerate phase (0.7 to 1.0)
+                decel_progress = (progress - 0.7) / 0.3
+                self.warp_speed = self.base_warp_speed + (1.0 - decel_progress ** 2) * 15.0
+            else:
+                # Animation complete
+                self.jump_animation_active = False
+                self.warp_speed = self.base_warp_speed
+                print("   ✓ Jump complete. Arrived at destination.\n")
+
         # Update starfield
         for star in self.stars:
             star.update(self.warp_speed)
@@ -472,19 +512,21 @@ class Desktop:
         if self.topbar:
             self.topbar.update(dt)
 
-        # Update tactical widget from combat state (if available)
+        # Update tactical widget from world state (if available)
         if hasattr(self, '_tactical_widget') and self._tactical_widget:
             world_manager = getattr(self._tactical_widget, 'world_manager', None)
-            if world_manager and world_manager.combat_state:
+            if world_manager:
+                # Always update from combat state (handles both combat and non-combat)
                 self._tactical_widget.update_from_combat(world_manager.combat_state)
 
-                # Update combat log with new events
-                combat_log = world_manager.combat_state.log
-                if combat_log:
-                    # Add new log entries
-                    for log_entry in combat_log:
-                        if log_entry not in self._tactical_widget.command_log:
-                            self._tactical_widget.command_log.append(log_entry)
+                # Update combat log with new events (if in combat)
+                if world_manager.combat_state:
+                    combat_log = world_manager.combat_state.log
+                    if combat_log:
+                        # Add new log entries
+                        for log_entry in combat_log:
+                            if log_entry not in self._tactical_widget.command_log:
+                                self._tactical_widget.command_log.append(log_entry)
 
         # Update windows
         for window in self.windows:
