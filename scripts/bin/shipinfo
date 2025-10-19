@@ -1,0 +1,15 @@
+#!/usr/bin/pooscript
+# Display detailed ship information
+# Shows all stats, shield recharge rate, system effectiveness, etc.
+
+# Read and display ship info
+try:
+    fd = kernel.open("/proc/ship_info", kernel.O_RDONLY)
+    ship_info = kernel.read(fd, 8192).decode('utf-8')
+    kernel.close(fd)
+
+    print(ship_info)
+
+except Exception as e:
+    error(f"Failed to read ship info: {e}")
+    exit(1)

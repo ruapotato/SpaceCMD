@@ -182,7 +182,7 @@ class Ship:
         # Ship resources
         self.hull_max = 30
         self.hull = 30
-        self.fuel = 20
+        self.dark_matter = 20  # Fuel for FTL jumps
         self.missiles = 8
         self.drone_parts = 4
         self.scrap = 0
@@ -430,7 +430,7 @@ class Ship:
             'ship_class': self.ship_class,
             'hull': self.hull,
             'hull_max': self.hull_max,
-            'fuel': self.fuel,
+            'dark_matter': self.dark_matter,
             'missiles': self.missiles,
             'scrap': self.scrap,
             'reactor_power': self.reactor_power,

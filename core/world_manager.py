@@ -206,8 +206,8 @@ class WorldManager:
 
         # Use some fuel
         fuel_cost = 1
-        if self.ship.fuel >= fuel_cost:
-            self.ship.fuel -= fuel_cost
+        if self.ship.dark_matter >= fuel_cost:
+            self.ship.dark_matter -= fuel_cost
 
         # Handle arrival at new node
         self._handle_node_arrival()

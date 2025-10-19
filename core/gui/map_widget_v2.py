@@ -48,15 +48,23 @@ class MapWidgetV2:
         self.world_manager = None
         self.ship_os = None
 
-        # Visual settings
-        self.node_radius = 25
-        self.sector_width = 180
-        self.node_spacing_y = 80
+        # Visual settings (base values)
+        self.base_node_radius = 25
+        self.base_sector_width = 180
+        self.base_node_spacing_y = 80
         self.padding = 40
+
+        # Zoom control
+        self.zoom = 1.0
+        self.min_zoom = 0.5
+        self.max_zoom = 2.0
 
         # Camera/scroll
         self.scroll_x = 0
         self.scroll_y = 0
+        self.dragging = False
+        self.drag_start = (0, 0)
+        self.last_mouse_pos = (0, 0)
 
         # Command log
         self.command_log = []
@@ -65,6 +73,21 @@ class MapWidgetV2:
         # Background stars
         self.bg_stars = [(random.randint(0, width), random.randint(0, height),
                          random.randint(1, 2)) for _ in range(50)]
+
+    @property
+    def node_radius(self):
+        """Get scaled node radius based on zoom"""
+        return int(self.base_node_radius * self.zoom)
+
+    @property
+    def sector_width(self):
+        """Get scaled sector width based on zoom"""
+        return int(self.base_sector_width * self.zoom)
+
+    @property
+    def node_spacing_y(self):
+        """Get scaled node spacing based on zoom"""
+        return int(self.base_node_spacing_y * self.zoom)
 
     def set_world_manager(self, world_manager):
         """Set world manager reference"""
@@ -78,9 +101,45 @@ class MapWidgetV2:
 
     def handle_event(self, event, mouse_pos):
         """Handle input events"""
+        # Mouse wheel zoom
+        if event.type == pygame.MOUSEWHEEL:
+            old_zoom = self.zoom
+            # Zoom in/out
+            self.zoom += event.y * 0.1
+            self.zoom = max(self.min_zoom, min(self.max_zoom, self.zoom))
+
+            # Zoom toward mouse cursor
+            if self.zoom != old_zoom:
+                zoom_factor = self.zoom / old_zoom
+                # Adjust scroll to zoom toward mouse
+                self.scroll_x = (self.scroll_x - mouse_pos[0]) * zoom_factor + mouse_pos[0]
+                self.scroll_y = (self.scroll_y - mouse_pos[1]) * zoom_factor + mouse_pos[1]
+
+            return True
+
+        # Middle mouse button drag for panning
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 2:  # Middle mouse
+            self.dragging = True
+            self.drag_start = mouse_pos
+            self.last_mouse_pos = mouse_pos
+            return True
+
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 2:
+            self.dragging = False
+            return True
+
+        if event.type == pygame.MOUSEMOTION and self.dragging:
+            dx = mouse_pos[0] - self.last_mouse_pos[0]
+            dy = mouse_pos[1] - self.last_mouse_pos[1]
+            self.scroll_x -= dx
+            self.scroll_y -= dy
+            self.last_mouse_pos = mouse_pos
+            return True
+
         if not self.world_manager:
             return False
 
+        # Left click on nodes
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             # Check if clicking on a node
             current_node = self.world_manager.world_map.get_current_node()
@@ -340,7 +399,12 @@ class MapWidgetV2:
             self.surface.blit(log_surf, (10, log_y))
             log_y += 15
 
-        # Instructions
+        # Instructions and zoom info
         hint_font = pygame.font.SysFont('sans-serif', 11)
-        hint = hint_font.render("Click yellow nodes to jump • Each jump uses fuel", True, (120, 120, 120))
-        self.surface.blit(hint, (self.width - 350, panel_y + 10))
+        hint = hint_font.render("Click yellow nodes to jump • Mouse wheel zoom • Middle-drag pan", True, (120, 120, 120))
+        self.surface.blit(hint, (self.width - 450, panel_y + 10))
+
+        # Zoom level
+        zoom_text = f"Zoom: {self.zoom:.1f}x"
+        zoom_surf = hint_font.render(zoom_text, True, (150, 150, 150))
+        self.surface.blit(zoom_surf, (self.width - 100, panel_y + 30))

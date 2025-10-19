@@ -186,7 +186,7 @@ class ShipRenderer:
         power_text = f"POWER:   {power_icons} {power_used}/{ship.reactor_power}"
 
         # Fuel
-        fuel_text = f"FUEL:    {ship.fuel}"
+        fuel_text = f"FUEL:    {ship.dark_matter}"
 
         lines.append("")
         lines.append(f"  {hull_text}")

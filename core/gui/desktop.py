@@ -188,7 +188,7 @@ class Desktop:
 
         # Menu state
         self.menu_open = False
-        self.menu_rect = pygame.Rect(4, height - Theme.TASKBAR_HEIGHT - 320, 200, 320)
+        self.menu_rect = pygame.Rect(4, height - Theme.TASKBAR_HEIGHT - 360, 200, 360)
 
         # ShipOS reference (will be set by play.py)
         self.ship_os = None
@@ -344,6 +344,24 @@ class Desktop:
         self.add_window(window)
         return window
 
+    def create_ship_info_window(self, title="Ship Info", x=150, y=100):
+        """
+        Create a ship info window showing detailed ship statistics.
+
+        Returns:
+            Window: The created window
+        """
+        from .ship_info_widget import ShipInfoWidget
+
+        if not self.ship_os:
+            return None
+
+        ship_info = ShipInfoWidget(500, 600)
+        ship_info.set_ship_os(self.ship_os)
+        window = Window(title, x, y, 500, 600, ship_info)
+        self.add_window(window)
+        return window
+
     def handle_events(self):
         """Handle all input events"""
         for event in pygame.event.get():
@@ -375,6 +393,10 @@ class Desktop:
                         # Ctrl+M: Galaxy map
                         self.create_map_window()
                         continue
+                    elif event.key == pygame.K_i:
+                        # Ctrl+I: Ship info
+                        self.create_ship_info_window()
+                        continue
 
             # Get mouse position
             mouse_pos = pygame.mouse.get_pos()
@@ -401,11 +423,13 @@ class Desktop:
                         self.create_file_browser_window()
                     elif item_index == 2:  # Text Editor
                         self.create_text_editor_window()
-                    elif item_index == 3:  # Tactical Display
+                    elif item_index == 3:  # Ship Info
+                        self.create_ship_info_window()
+                    elif item_index == 4:  # Tactical Display
                         self.create_tactical_window()
-                    elif item_index == 4:  # Galaxy Map
+                    elif item_index == 5:  # Galaxy Map
                         self.create_map_window()
-                    elif item_index == 6:  # Quit (after separator)
+                    elif item_index == 7:  # Quit (after separator)
                         self.running = False
 
                     self.menu_open = False
@@ -535,6 +559,7 @@ class Desktop:
             "New Terminal",
             "File Browser",
             "Text Editor",
+            "Ship Info",
             "Tactical Display",
             "Galaxy Map",
             "---",

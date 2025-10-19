@@ -115,7 +115,7 @@ class ShipOSBridge:
         self._create_virtual_file('/ship/shields_max',
                                  lambda: str(self.ship.shields_max))
         self._create_virtual_file('/ship/fuel',
-                                 lambda: str(self.ship.fuel))
+                                 lambda: str(self.ship.dark_matter))
         self._create_virtual_file('/ship/scrap',
                                  lambda: str(self.ship.scrap))
         self._create_virtual_file('/ship/power_available',
@@ -242,7 +242,7 @@ print("=" * 60)
 print(f"Hull:    {hull}/{hull_max}")
 print(f"Shields: {shields}/{shields_max}")
 print(f"Power:   {power_used}/{power_total}")
-print(f"Fuel:    {fuel}")
+print(f"Dark Matter:    {fuel}")
 print("=" * 60)
 '''
 

@@ -21,7 +21,7 @@ def create_gnat() -> Ship:
     ship.hull = 5
     ship.reactor_power = 2
     ship.power_available = 2
-    ship.fuel = 0
+    ship.dark_matter = 0
     ship.scrap = 5  # Small reward
 
     # Minimal layout - just one tiny room
@@ -73,7 +73,7 @@ def create_pirate_scout() -> Ship:
     ship.hull = 15
     ship.reactor_power = 4
     ship.power_available = 4
-    ship.fuel = 0
+    ship.dark_matter = 0
     ship.scrap = 15  # Reward for defeating
 
     # Simple layout

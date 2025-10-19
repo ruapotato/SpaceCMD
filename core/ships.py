@@ -20,7 +20,7 @@ def create_kestrel() -> Ship:
     ship.hull = 30
     ship.reactor_power = 8
     ship.power_available = 8
-    ship.fuel = 20
+    ship.dark_matter = 20
     ship.missiles = 8
     ship.scrap = 0
 
@@ -135,7 +135,7 @@ def create_stealth_cruiser() -> Ship:
     ship.hull = 20
     ship.reactor_power = 6
     ship.power_available = 6
-    ship.fuel = 16
+    ship.dark_matter = 16
     ship.missiles = 4
     ship.scrap = 0
 
@@ -212,7 +212,7 @@ def create_mantis_cruiser() -> Ship:
     ship.hull = 25
     ship.reactor_power = 7
     ship.power_available = 7
-    ship.fuel = 18
+    ship.dark_matter = 18
     ship.missiles = 6
     ship.scrap = 0
 

@@ -160,7 +160,7 @@ Good luck, Captain!
             ('hull', lambda: f"{self.ship.hull}\n"),
             ('shields', lambda: f"{int(self.ship.shields)}\n"),
             ('reactor', lambda: f"{self.ship.reactor_power}\n"),
-            ('fuel', lambda: f"{self.ship.fuel}\n"),
+            ('dark_matter', lambda: f"{self.ship.dark_matter}\n"),
         ]
 
         for device_name, read_func in device_specs:
@@ -188,7 +188,7 @@ Class: {self.ship.ship_class}
 Hull: {self.ship.hull}/{self.ship.hull_max}
 Shields: {int(self.ship.shields)}/{self.ship.shields_max}
 Power: {self.ship.reactor_power - self.ship.power_available}/{self.ship.reactor_power}
-Fuel: {self.ship.fuel}
+Dark Matter: {self.ship.dark_matter}
 Scrap: {self.ship.scrap}
 Crew: {len(self.ship.crew)}
 """
@@ -464,6 +464,99 @@ Visited: {'Yes' if node.visited else 'No'}
 
         self.vfs.device_handlers['dev_ship_jump'] = (lambda size: b"Write node ID to jump\n", jump_write)
         self.vfs.create_device('/dev/ship/jump', True, 0, 0, device_name='dev_ship_jump')
+
+        # /proc/ship_info - detailed ship statistics
+        def ship_info_read(size):
+            """Comprehensive ship information including all stats and rates"""
+            info = f"""╔═══════════════════════════════════════════════════════════════╗
+║                    {self.ship.name.upper()} SHIP INFO                     ║
+╚═══════════════════════════════════════════════════════════════╝
+
+CLASS: {self.ship.ship_class}
+
+=== HULL & SHIELDS ===
+Hull:           {self.ship.hull:.1f} / {self.ship.hull_max}
+Shields:        {int(self.ship.shields)} / {self.ship.shields_max}
+"""
+
+            # Calculate shield recharge rate
+            if SystemType.SHIELDS in self.ship.systems:
+                shields_system = self.ship.systems[SystemType.SHIELDS]
+                if shields_system.room:
+                    shield_effectiveness = shields_system.get_effectiveness()
+                    shield_recharge_rate = shield_effectiveness  # shields per second
+                    info += f"Shield Recharge: {shield_recharge_rate:.2f} /sec"
+
+                    # Show breakdown
+                    if shields_system.is_online():
+                        health_pct = shields_system.room.health * 100
+                        power_ratio = shields_system.room.power_allocated / shields_system.room.max_power
+                        crew_bonus_pct = shields_system.room.crew_bonus * 100
+                        info += f" (Health: {health_pct:.0f}% × Power: {power_ratio:.0%} × Crew: +{crew_bonus_pct:.0f}%)"
+                    else:
+                        info += " [OFFLINE]"
+                    info += "\n"
+            else:
+                info += "Shield Recharge: N/A (no shield system)\n"
+
+            # Power system
+            info += f"""
+=== POWER ===
+Reactor Output:  {self.ship.reactor_power}
+Power Available: {self.ship.power_available}
+Power Allocated: {self.ship.reactor_power - self.ship.power_available}
+
+=== RESOURCES ===
+Dark Matter:    {self.ship.dark_matter}
+Missiles:       {self.ship.missiles}
+Scrap:          {self.ship.scrap}
+
+=== SYSTEMS ===
+"""
+
+            # List all systems with effectiveness
+            for system_type, system in self.ship.systems.items():
+                if system_type == SystemType.NONE:
+                    continue
+
+                room = system.room
+                if not room:
+                    continue
+
+                effectiveness = system.get_effectiveness()
+                status = "ONLINE" if system.is_online() else "OFFLINE"
+
+                info += f"{system_type.value.capitalize():12} [{status:7}] "
+                info += f"PWR:{room.power_allocated}/{room.max_power} "
+                info += f"HP:{room.health:.0%} "
+                info += f"EFF:{effectiveness:.1%}\n"
+
+            # Crew count
+            info += f"""
+=== CREW ===
+Total Crew:     {len(self.ship.crew)}
+"""
+            for crew in self.ship.crew:
+                location = crew.room.name if crew.room else "Unassigned"
+                info += f"  {crew.name:20} @ {location:12} HP:{crew.health:3.0f}\n"
+
+            # Weapons
+            info += f"""
+=== WEAPONS ===
+"""
+            if self.ship.weapons:
+                for i, weapon in enumerate(self.ship.weapons):
+                    charge_pct = weapon.charge * 100
+                    status = "READY" if weapon.is_ready() else f"{charge_pct:.0f}%"
+                    info += f"{i+1}. {weapon.name:18} DMG:{weapon.damage:2} "
+                    info += f"CD:{weapon.cooldown_time:4.1f}s [{status:6}]\n"
+            else:
+                info += "No weapons installed\n"
+
+            return info.encode('utf-8')
+
+        self.vfs.device_handlers['proc_ship_info'] = (ship_info_read, lambda data: 0)
+        self.vfs.create_device('/proc/ship_info', True, 0, 0, device_name='proc_ship_info')
 
     def _mount_systems_sysfs(self):
         """Mount ship systems to /sys/ship/systems (like /sys/class/net)"""
