@@ -31,315 +31,243 @@ You are a **robot crew member** on a spaceship. Every ship (yours and enemies) r
 
 ## 📊 Current Status
 
-### ✅ COMPLETED (Core Systems)
+### ✅ PHASE 1-3 COMPLETE! Combat-Ready System
 
-#### 1. VFS (Virtual File System) - `core/os/vfs.gd`
-Complete Unix-like filesystem implementation:
+#### Phase 1: Core OS ✅
+**VFS (Virtual File System)** - `core/os/vfs.gd` (~450 lines)
 - ✅ Inodes (files, directories, devices, symlinks)
-- ✅ Path resolution
-- ✅ Permissions (UID/GID, mode bits)
-- ✅ Device file support with handlers
-- ✅ Complete operations (mkdir, create, read, write, unlink)
-- ✅ **Isolated per-ship** (each ship has own VFS)
+- ✅ Path resolution with permissions
+- ✅ Device file support with callbacks
+- ✅ Isolated per-ship (each ship has own VFS)
 
-**Lines**: ~420 | **Tested**: ⏳ Pending
-
-#### 2. PooScript Interpreter - `core/scripting/pooscript.gd`
-Process management system for enemy AI:
-- ✅ GDScript-powered scripting (PooScript looks like Python/GDScript)
+**PooScript Interpreter** - `core/scripting/pooscript.gd` (~270 lines)
 - ✅ Process table with PIDs
-- ✅ Process states (CREATED, RUNNING, SLEEPING, STOPPED, ZOMBIE)
-- ✅ **kill(pid)** - Kill enemy AI processes!
+- ✅ Process states (CREATED, RUNNING, STOPPED, etc.)
+- ✅ kill(pid) - Disable enemy AI!
 - ✅ Dynamic script execution
-- ✅ Process isolation
-- ✅ **ps()** command support
+- ✅ ps() command
 
-**Lines**: ~270 | **Tested**: ⏳ Pending
-
-**Key Feature**: Player can `kill 42` to stop enemy AI script!
-
-#### 3. Kernel Interface - `core/os/kernel.gd`
-Syscall interface for PooScript:
+**Kernel Interface** - `core/os/kernel.gd` (~150 lines)
 - ✅ File descriptor table (per-process)
-- ✅ sys_open/read/write/close
-- ✅ sys_stat/mkdir/unlink/readdir
-- ✅ Safe VFS access from scripts
+- ✅ Syscalls: open/read/write/close/stat/mkdir
+- ✅ Safe VFS access from PooScript
 
-**Lines**: ~150 | **Tested**: ⏳ Pending
+#### Phase 2: ShipOS Integration ✅
+**ShipOS** - `core/os/ship_os.gd` (~330 lines)
+- ✅ VFS + PooScript + Kernel combined per ship
+- ✅ 16 device files (/dev/ship/*, /proc/ship/*)
+- ✅ Sensor system (nearby_ships, targeting)
+- ✅ Weapon firing integration
+- ✅ Bi-directional device bridge (ship state ↔ OS)
 
-#### 4. Project Structure
+**Hostile AI** - `scripts/ai/hostile.poo` (~115 lines)
+- ✅ Fully autonomous enemy AI
+- ✅ Scans sensors for enemies
+- ✅ Acquires targets automatically
+- ✅ Fires weapons when in range
+- ✅ Killable via process termination
+
+#### Phase 3: Combat Manager ✅
+**CombatManager** - `core/combat/combat_manager.gd` (~290 lines)
+- ✅ Multi-ship battle orchestration
+- ✅ Ship management by faction (player/enemy/neutral)
+- ✅ Projectile spawning and tracking
+- ✅ Collision detection and damage
+- ✅ Victory/defeat conditions
+- ✅ Signals for game integration
+
+**Projectile** - `core/combat/projectile.gd` (~60 lines)
+- ✅ Position/velocity tracking
+- ✅ Collision detection
+- ✅ Lifetime management
+
+#### Ship Classes
+- ✅ **Ship** - Hull, shields, weapons, position (3D combat + 1D galaxy)
+- ✅ **Weapon** - Damage, charge, cooldown, firing
+- ✅ **Room** - Systems, power, damage states
+- ✅ **Crew** - Skills, health, assignments
+
+#### Project Structure
 ```
-SpaceCMD/                    (Godot project root)
+SpaceCMD/
 ├── core/
-│   ├── os/          ✅ VFS (420 lines), Kernel (150 lines)
-│   ├── scripting/   ✅ PooScript (270 lines)
-│   ├── ship/        ✅ Ship, Room, Crew, Weapon classes
-│   ├── combat/      ⏳ Stub created
-│   ├── hacking/     ⏳ Stub created
-│   ├── network/     ⏳ To be implemented
-│   └── galaxy/      ⏳ To be implemented
-├── autoload/        ✅ GameManager stub
-├── tests/           ✅ Test suite created
-├── scripts/ai/      ✅ hostile.poo example
-├── project.godot    ✅ Godot 4.4 config
-└── OG_python_version/  (Original Python implementation)
+│   ├── os/          ✅ VFS, Kernel, ShipOS
+│   ├── scripting/   ✅ PooScript
+│   ├── combat/      ✅ CombatManager, Projectile
+│   ├── ship/        ✅ Ship, Weapon, Room, Crew
+│   ├── galaxy/      ✅ Stub created
+│   └── hacking/     ⏳ To be implemented
+├── autoload/        ✅ GameManager, CombatManager
+├── tests/           ✅ Comprehensive test suite
+├── scripts/ai/      ✅ hostile.poo (working!)
+└── project.godot    ✅ Godot 4.4 config
 ```
 
-**Total Code**: ~900 lines of core systems ✅
+**Total Code**: ~2,100 lines | **All Tests**: ✅ Passing
 
 ---
 
-## 🚧 TODO
+## 🚧 Phase 4: Choose Your Direction!
 
-### Phase 1: Testing & Verification ⚠️ **NEXT**
-- [ ] **Run test suite headless**
-  ```bash
-  cd ~/SpaceCMD
-  ../Godot_v4.4.1-stable_linux.x86_64 --headless tests/test_core_systems.gd
-  ```
-- [ ] Fix any VFS bugs
-- [ ] Fix any PooScript bugs
-- [ ] Fix any Kernel bugs
-- [ ] Verify device handlers work
+Combat foundation is complete. Pick your next path:
 
-### Phase 2: Integration
-- [ ] **Device Bridge** (GDScript ↔ PooScript)
-  - Ship state → device file updates
-  - Device writes → ship action callbacks
-  - Bi-directional sync system
-- [ ] **ShipOS Integration** (`core/os/ship_os.gd`)
-  - Combine VFS + PooScript + Kernel
-  - Mount ship devices (/dev/ship/hull, /proc/ship/status)
-  - Auto-spawn init process
-  - Update loop (sync ship state ↔ OS state)
-
-### Phase 3: Ship Systems
-- [ ] **Complete Ship class** (`core/ship/ship.gd`)
-  - Hull, shields, power, resources
-  - Rooms dictionary
-  - Systems dictionary
-  - Crew array
-  - Weapons array
-- [ ] **Room class** (`core/ship/room.gd`)
-  - Position in ship grid
-  - System type (HELM, WEAPONS, ENGINES, etc.)
-  - Power allocation
-  - Health tracking
-  - Fire/breach/venting states
-- [ ] **Crew class** (`core/ship/crew.gd`)
-  - Bot crew members
-  - Skills (helm, weapons, shields, etc.)
-  - Health tracking
-  - Room assignment
-- [ ] **Weapon class** (`core/ship/weapon.gd`)
-  - Damage, cooldown, charge
-  - Range, pierce, missile requirements
-  - Weapon types (laser, beam, missile)
-
-### Phase 4: Multi-Room Ship Generation
-- [ ] **Ship layout generator** (`core/ship/ship_generator.gd`)
-  - Room graph (connectivity)
-  - Programmatic generation (like FTL)
-  - Different ship classes (Kestrel, Stealth Cruiser, etc.)
-- [ ] **3D mesh generation**
-  - Room boxes (walls, floor, ceiling)
-  - Doorways between connected rooms
-  - Terminal positions (helm, weapons, engines)
-  - Airlock locations
-- [ ] **Interior navigation**
-  - Navmesh for bot movement
-  - Door collision/interaction
-  - Room transitions
-
-### Phase 5: Player Bot Controller
-- [ ] **FPS controller** (`scenes/player/player_bot.gd`)
-  - CharacterBody3D
-  - WASD movement
-  - Mouse look
-  - Interact with terminals
-  - Interact with doors
-- [ ] **Terminal interaction**
-  - Raycast to detect terminal
-  - Prompt to access (E key)
-  - Open terminal UI
-  - Connected to ShipOS of current ship
-
-### Phase 6: Terminal UI
-- [ ] **In-world terminal** (`scenes/ui/terminal.gd`)
-  - VT100-style text display
-  - Keyboard input capture
-  - Command history (up/down arrows)
-  - Connected to ShipOS instance
-  - Display stdout/stderr
-- [ ] **Terminal commands**
-  - ls, cd, cat, mkdir
-  - ps, kill
-  - cat /dev/ship/hull
-  - cat /proc/ship/status
-  - pooscript /bin/script.poo
-
-### Phase 7: Enemy AI & Scripts
-- [ ] **Basic enemy AI** (`scripts/ai/hostile.poo`)
-  - Read /proc/ship/weapons
-  - Write to /dev/ship/fire
-  - Auto-targeting logic
-  - Weapon charging checks
-- [ ] **Advanced AI variants**
-  - `aggressive.poo` - Rush and overwhelm
-  - `defensive.poo` - Shields up, retreat when damaged
-  - `kamikaze.poo` - Ram player ship
-  - `coward.poo` - Run away immediately
-- [ ] **AI process spawning**
-  - Auto-spawn on ship creation
-  - Different AI per ship type
-  - Boss ships with multi-stage AI
-
-### Phase 8: Combat System
-- [ ] **Combat state** (`core/combat/combat_state.gd`)
-  - Turn-based or real-time?
-  - Weapon firing logic
-  - Damage calculation
-  - Shield mechanics
-  - System damage
-- [ ] **3D combat visuals**
-  - Projectile spawning
-  - Weapon firing effects
-  - Shield hit effects
-  - Explosion effects
-  - Hull damage visuals
-
-### Phase 9: Hacking System
-- [ ] **Network exploits** (`core/hacking/hacking_system.gd`)
-  - Exploit types (buffer overflow, zero-day, backdoor)
-  - Range-based connection
-  - Temporary SSH access
-  - Connection drops if too far
-- [ ] **Exploit laser weapon**
-  - 3D projectile
-  - On hit: grant OS access
-  - Duration timer
-  - Range limits
-- [ ] **Physical boarding**
-  - Airlock docking
-  - Load enemy ship interior
-  - Navigate to helm
-  - Access terminal → full control
-
-### Phase 10: Galaxy & World
-- [ ] **Galaxy manager** (`core/galaxy/galaxy.gd`)
-  - 1D linear galaxy (distance from center)
-  - POI system (stores, encounters, nebulas)
-  - Difficulty scaling
-- [ ] **Ship spawning**
-  - Random enemy ships
-  - Different factions
-  - Boss encounters
-- [ ] **FTL travel**
-  - Jump between locations
-  - Dark matter fuel cost
-  - Encounters along the way
-
-### Phase 11: 3D Flight & Dogfighting
-- [ ] **Player ship 3D** (`scenes/space/player_ship.tscn`)
-  - Ship mesh
-  - Engine trail particles
+### Option A: Visual Combat (3D Scene) 🎨
+- [ ] **Battle scene** (`scenes/combat/battle.tscn`)
+  - 3D space environment
+  - Camera system
+  - Starfield background
+- [ ] **Ship visuals**
+  - Simple ship models (cubes to start)
+  - Engine particle trails
   - Weapon hardpoints
-- [ ] **Flight controls**
-  - WASD thrust
-  - Mouse look for aiming
-  - Space for primary fire
-  - Shift for boost
-- [ ] **Manual targeting**
-  - Crosshair in 3D space
-  - Lead indicator
-  - Range indicators
-  - Auto-targeting (shorter range)
-
-### Phase 12: Polish & Effects
-- [ ] **Sound effects**
-  - Weapon firing
-  - Explosions
-  - Shield hits
-  - Engine sounds
-  - Terminal beeps
-- [ ] **Particle effects**
-  - Engine trails
-  - Weapon shots
-  - Explosions
-  - Shield impacts
-- [ ] **UI/HUD**
-  - Ship status display
-  - Weapon charge bars
+- [ ] **Projectile effects**
+  - Laser tracers
+  - Hit particles
+  - Explosion effects
+- [ ] **Combat HUD**
+  - Ship status (hull/shields)
   - Target info
-  - Minimap
-- [ ] **Galaxy map**
-  - Visual representation
-  - POI markers
-  - Current location
-  - Jump destinations
+  - Weapon charge bars
+
+### Option B: Advanced AI Variants 🤖
+- [ ] **aggressive.poo** - Rush tactics, fire constantly
+- [ ] **defensive.poo** - Shield focus, retreat when damaged
+- [ ] **coward.poo** - Flee on first contact
+- [ ] **boss.poo** - Multi-stage attack patterns
+- [ ] **kamikaze.poo** - Ram player ship
+- [ ] **trader.poo** - Evasive maneuvers only
+
+### Option C: Ship Systems & Power ⚡
+- [ ] **Power allocation system**
+  - Distribute power between weapons/shields/engines
+  - Power affects effectiveness
+- [ ] **System damage**
+  - Weapons offline when room damaged
+  - Engines slow when damaged
+  - Shields fail when room breached
+- [ ] **Shield recharge**
+  - Auto-recharge over time
+  - Power allocation affects rate
+- [ ] **Crew effectiveness**
+  - Skill bonuses to systems
+  - Damage/repair mechanics
+
+### Option D: Player Control UI 🎮
+- [ ] **Ship status panel**
+  - Hull/shields display
+  - Power distribution sliders
+  - System status indicators
+- [ ] **Weapon control**
+  - Weapon selection buttons
+  - Charge indicators
+  - Manual fire controls
+- [ ] **Targeting system**
+  - Target selection UI
+  - Distance/status display
+  - Auto-target toggle
+- [ ] **Terminal interface**
+  - In-game console
+  - Command input
+  - OS access for hacking
+
+### Option E: Combat Scenarios 🎯
+- [ ] **Wave system**
+  - Spawn enemies in waves
+  - Difficulty progression
+  - Reward scrap for victories
+- [ ] **Boss encounters**
+  - Special boss ships
+  - Multi-phase battles
+  - Unique AI patterns
+- [ ] **Fleet battles**
+  - Multiple ships per side
+  - Friendly AI ships
+  - Formation tactics
+- [ ] **Victory conditions**
+  - Survive X seconds
+  - Protect allied ship
+  - Destroy specific target
+
+### Future Phases (Later)
+- **Multi-Room Ships** - Interior navigation, room generation
+- **Player Bot** - FPS controller, terminal interaction
+- **Hacking System** - Network exploits, physical boarding
+- **Galaxy Map** - FTL travel, encounters, progression
+- **Polish** - Sound, VFX, UI refinement
 
 ---
 
 ## 🧪 Testing
 
-### Headless Tests (Core Systems)
+### Run All Tests
 ```bash
-# Navigate to project root
 cd ~/SpaceCMD
 
-# Run test suite (no graphics needed)
-../Godot_v4.4.1-stable_linux.x86_64 --headless tests/test_core_systems.gd
+# Core systems (VFS, PooScript, Kernel)
+./Godot_v4.4.1-stable_linux.x86_64 --headless --script tests/test_core_systems.gd
+
+# ShipOS integration (device bridge, sensors, weapons)
+./Godot_v4.4.1-stable_linux.x86_64 --headless --script tests/test_ship_os.gd
+
+# Hostile AI (autonomous targeting and firing)
+./Godot_v4.4.1-stable_linux.x86_64 --headless --script tests/test_hostile_ai.gd
+
+# Combat Manager (multi-ship battles, projectiles, damage)
+./Godot_v4.4.1-stable_linux.x86_64 --headless --script tests/test_combat_simple.gd
 ```
 
-**Tests**:
+**Test Coverage**:
 - ✅ VFS operations (mkdir, create, read, write, devices)
 - ✅ PooScript execution (spawn, kill, ps)
 - ✅ Kernel syscalls (open, read, write, close)
+- ✅ ShipOS device bridge (16 device files)
+- ✅ Sensor system (nearby ships, targeting)
+- ✅ Weapon firing integration
+- ✅ Hostile AI (scans, targets, fires)
+- ✅ Combat orchestration (projectiles, collisions, damage)
+- ✅ Victory/defeat conditions
 
-### Expected Output
-```
-============================================================
-SPACECMD CORE SYSTEMS TEST
-============================================================
+### Quick Demo
+```gdscript
+# Create ships
+var player = Ship.new("USS Enterprise", "Cruiser")
+player.position = Vector3(0, 0, 0)
+player.os = ShipOS.new(player)
 
-[TEST 1: VFS]
-✓ VFS created
-✓ Root directory exists
-✓ Created /test directory
-✓ Created /test/hello.txt
-✓ Read file contents: Hello from VFS!
-✓ Listed directory, found 3 entries
-✓ Device file works: Device data
-✅ VFS: ALL TESTS PASSED
+var enemy = Ship.new("Pirate", "Scout")
+enemy.position = Vector3(500, 0, 0)
+enemy.os = ShipOS.new(enemy)
 
-[TEST 2: PooScript]
-✓ PooScript created
-✓ Created test script
-[PID 2] Hello from PooScript!
-[PID 2] Sum: 30
-✓ Spawned script with PID: 2
-✓ Process found in table
-✓ ps() returned 1 process(es)
-  PID: 2 CMD: /test_script.poo STATE: RUNNING
-✓ Killed process 2
-✓ Process state is STOPPED
-✅ PooScript: ALL TESTS PASSED
+# Add weapon
+var laser = Weapon.new("Burst Laser")
+laser.damage = 10.0
+laser.charge = 1.0
+enemy.weapons.append(laser)
 
-[TEST 3: Kernel]
-✓ Kernel created
-✓ Opened file with FD: 3
-✓ Read data: Kernel test data
-✓ Closed file
-✓ Wrote 8 bytes
-✓ Verified written data: New data
-✓ stat() returned size: 8
-✓ Created directory via kernel
-✓ readdir() returned 13 entries
-✅ Kernel: ALL TESTS PASSED
+# Register with CombatManager
+CombatManager.add_ship(player, "player")
+CombatManager.add_ship(enemy, "enemy")
+player.os.combat_manager = CombatManager
+enemy.os.combat_manager = CombatManager
 
-============================================================
-ALL TESTS COMPLETE
-============================================================
+# Start battle
+CombatManager.start_battle()
+
+# Spawn hostile AI
+var ai = FileAccess.get_file_as_string("res://scripts/ai/hostile.poo")
+enemy.os.vfs.create_file("/bin/hostile.poo", 0x1ED, 0, 0, ai.to_utf8_buffer())
+var pid = enemy.os.execute_command("/bin/hostile.poo")
+
+# AI automatically:
+# 1. Scans /proc/ship/sensors
+# 2. Writes /dev/ship/target
+# 3. Fires weapon via /dev/ship/actions/fire
+# 4. CombatManager spawns projectile
+# 5. Projectile travels and hits player
+# 6. Damage applied (shields → hull)
+
+# Player can hack:
+enemy.os.kill_process(pid)  # AI disabled!
 ```
 
 ---
@@ -465,17 +393,18 @@ cd ~/SpaceCMD
 
 ---
 
-## 📝 Current Sprint: Phase 1 Testing
+## 📝 Current Status: Phase 3 Complete! 🎉
 
-**Goal**: Verify core systems work correctly
+**Completed**: Combat Manager system
+- ✅ Multi-ship battle orchestration
+- ✅ Projectile spawning and collision
+- ✅ Damage system (shields → hull)
+- ✅ Victory/defeat conditions
+- ✅ Full AI combat integration
 
-**Tasks**:
-1. Run test suite
-2. Fix any bugs
-3. Document test results
-4. Move to Phase 2 (Device Bridge)
+**Next**: Choose Phase 4 direction (see options above)
 
-**Status**: ⏳ Ready to test
+**Recommended**: Option A (Visual Combat) or Option B (AI Variants) for immediate gameplay impact
 
 ---
 
@@ -492,6 +421,6 @@ This is a demonstration project. Core systems are built, now building the 3D lay
 
 ---
 
-**Status**: Core OS complete, building spaceship! 🚀
+**Status**: Phases 1-3 Complete - Combat System Operational! 🚀
 
-*"Every ship is a computer. Every computer can be hacked."*
+*"Every ship is a computer. Every battle is data. Every hit is a syscall."*
