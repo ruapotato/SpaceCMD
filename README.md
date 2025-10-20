@@ -1,748 +1,497 @@
-# 💻🚀 SpaceCMD - HACKERS MEET FTL
+# SpaceCMD - Godot Edition
 
-> A roguelike spaceship game where **every ship is a computer** and you can hack your enemies with real PooScript code.
+**Hackers meet FTL in 3D space**
 
-```
-╔═══════════════════════════════════════════════════════════════╗
-║                    SPACECMD - HACKERS MEET FTL                ║
-║           Command-Line Spaceship Combat Simulator             ║
-║                 Every Ship Is A Computer                      ║
-╚═══════════════════════════════════════════════════════════════╝
-```
+A roguelike spaceship game where every ship is a real computer running an OS, and you hack enemies with actual PooScript code - now in full 3D!
 
-## 🎮 What Is SpaceCMD?
+## 🎮 Core Concept
 
-**SpaceCMD** is the world's first roguelike where:
-- Every ship runs a **real Unix-like OS** (ShipOS)
-- You can **hack enemy ships** with actual exploits
-- **PooScript programming** is required to win
-- Combat combines **FTL-style tactics** with **network hacking**
-- All AI and automation is **real executable code**
+You are a **robot crew member** on a spaceship. Every ship (yours and enemies) runs a real operating system with:
+- **Unix-like filesystem** (VFS with device files)
+- **PooScript processes** (enemy AI, automation scripts)
+- **Full OS emulation** per ship (isolated instances)
 
-Think **FTL** meets **Uplink** meets **Unix terminals**.
+### Attack Vectors
 
----
+1. **Physical Boarding** 🤖
+   - Walk through your ship in 3D
+   - Dock at enemy airlock
+   - Fight through their ship
+   - Reach their helm terminal
+   - Access their OS directly → kill AI processes
 
-## 🏆 Three Play Modes (Difficulty Progression)
-
-SpaceCMD can be played three ways. **To beat the final boss, you MUST use PooScript automation.**
-
-### 1. 🖥️ GUI Mode (EASY - Visual Learning)
-
-**Best for**: First-time players, learning the game, casual play
-
-**Launch**: `python3 play.py` or `./play_hacker_mode.sh`
-
-**Features:**
-- Beautiful desktop environment
-- Visual windows and panels
-- Tactical ship display
-- Galaxy map
-- Mouse + keyboard
-- Perfect for learning
-
-**You can:** Learn systems, practice combat, explore galaxy
-**You cannot:** Beat late-game enemies (too fast for manual play)
-
-```bash
-python3 play.py --gui
-```
+2. **Network Exploit** 🔫
+   - Purchase exploit (costs scrap)
+   - Get within laser range (5-10 units)
+   - Fire exploit laser
+   - Gain temporary SSH access
+   - **Connection lost if you fly too far!**
 
 ---
 
-### 2. ⌨️ Console Mode (NORMAL - Terminal Mastery)
+## 📊 Current Status
 
-**Best for**: Terminal users, debugging, practicing commands
+### ✅ COMPLETED (Core Systems)
 
-**Launch**: `python3 play.py --no-gui --console`
+#### 1. VFS (Virtual File System) - `core/os/vfs.gd`
+Complete Unix-like filesystem implementation:
+- ✅ Inodes (files, directories, devices, symlinks)
+- ✅ Path resolution
+- ✅ Permissions (UID/GID, mode bits)
+- ✅ Device file support with handlers
+- ✅ Complete operations (mkdir, create, read, write, unlink)
+- ✅ **Isolated per-ship** (each ship has own VFS)
 
-**Features:**
-- Pure text interface
-- All ship commands
-- Real-time combat
-- Full hacking system
-- Works over SSH
-- Professional CLI
+**Lines**: ~420 | **Tested**: ⏳ Pending
 
-**You can:** Master all commands, manual combat, hacking practice
-**You cannot:** React fast enough for final boss
+#### 2. PooScript Interpreter - `core/scripting/pooscript.gd`
+Process management system for enemy AI:
+- ✅ GDScript-powered scripting (PooScript looks like Python/GDScript)
+- ✅ Process table with PIDs
+- ✅ Process states (CREATED, RUNNING, SLEEPING, STOPPED, ZOMBIE)
+- ✅ **kill(pid)** - Kill enemy AI processes!
+- ✅ Dynamic script execution
+- ✅ Process isolation
+- ✅ **ps()** command support
 
-```bash
-python3 play.py --no-gui --console --ship kestrel
+**Lines**: ~270 | **Tested**: ⏳ Pending
+
+**Key Feature**: Player can `kill 42` to stop enemy AI script!
+
+#### 3. Kernel Interface - `core/os/kernel.gd`
+Syscall interface for PooScript:
+- ✅ File descriptor table (per-process)
+- ✅ sys_open/read/write/close
+- ✅ sys_stat/mkdir/unlink/readdir
+- ✅ Safe VFS access from scripts
+
+**Lines**: ~150 | **Tested**: ⏳ Pending
+
+#### 4. Project Structure
 ```
-
-**Example session:**
-```
-Nautilus [COMBAT]> scan
-🔍 Enemy has buffer overflow vulnerability
-
-Nautilus [COMBAT]> exploit buffer-overflow weapons
-✓ Enemy weapons system crashed!
-
-Nautilus [COMBAT]> malware worm shields
-🦠 Worm deployed, damaging shields...
-
-Nautilus [COMBAT]> fire 1
-⚡ Hit! Enemy shields down!
-
-Nautilus [COMBAT]> fire 1
-💥 Enemy destroyed! +50 scrap
-```
-
----
-
-### 3. 📜 PooScript Mode (HACKER - **REQUIRED TO WIN**)
-
-**Best for**: Programmers, advanced players, BEATING THE GAME
-
-**Launch**: Write `.poo` scripts and execute them
-
-**Features:**
-- Full programming language
-- Complete filesystem access
-- Network hacking automation
-- AI combat scripts
-- Malware creation
-- **THE ONLY WAY TO WIN**
-
-**You can:** Automate everything, write AI, beat final boss
-**You must:** Use this mode to win the game!
-
-**Why it's required:**
-- ✅ Late-game enemies attack too fast for manual play
-- ✅ Final boss has automated defenses
-- ✅ Multi-system management needs automation
-- ✅ Complex tactics require scripting
-- ✅ **Manual play = impossible to win**
-
-**Example combat automation:**
-```python
-#!/usr/bin/pooscript
-# automated_combat.poo - Auto combat script
-
-import os
-import time
-
-def auto_combat():
-    print("🤖 AUTOMATED COMBAT")
-
-    # Network attack
-    os.system("scan")
-    os.system("exploit dos weapons")
-    os.system("upload-malware worm")
-
-    # Kinetic attack
-    os.system("target shields")
-
-    # Auto-fire loop
-    while True:
-        fd = kernel.open("/proc/ship/weapons", kernel.O_RDONLY)
-        weapons = kernel.read(fd, 4096).decode('utf-8')
-        kernel.close(fd)
-
-        if "READY" in weapons:
-            os.system("fire 1")
-
-        # Check if won
-        fd = kernel.open("/proc/ship/enemy", kernel.O_RDONLY)
-        enemy = kernel.read(fd, 4096).decode('utf-8')
-        kernel.close(fd)
-
-        if "destroyed" in enemy.lower():
-            break
-
-        time.sleep(0.5)
-
-    print("✓ Victory!")
-
-auto_combat()
-```
-
-**Run it:**
-```bash
-Nautilus [COMBAT]> pooscript automated_combat.poo
-# Sits back and watches automation win
-```
-
----
-
-## 💻 The Hacking System (What Makes This Special)
-
-### Every Ship Is A Computer
-
-- **IP Address**: 192.168.x.x assigned to each ship
-- **Open Ports**: SSH (22), HTTP (80), MySQL (3306)
-- **Running Services**: Real network services
-- **Filesystem**: Complete `/sys/`, `/dev/`, `/proc/` structure
-- **Operating System**: Full ShipOS with kernel
-
-### Real Network Hacking
-
-You can actually:
-1. **Port scan** enemy ships (nmap-style)
-2. **Exploit vulnerabilities** (buffer overflow, SQL injection, etc.)
-3. **SSH into enemy ships** for remote access
-4. **Upload malware** (real PooScript files!)
-5. **Execute code** on their system
-6. **Modify their files** to disable systems
-7. **Plant backdoors** for persistent access
-
-### Available Exploits
-
-| Exploit | Success | Effect | Real Implementation |
-|---------|---------|--------|---------------------|
-| **buffer-overflow** | 70% | Crash system | Writes corrupt data to `/sys/ship/systems/X/power` |
-| **sql-injection** | 60% | Steal data | Reads `/etc/passwd`, `/proc/ship/status` |
-| **backdoor** | 50% | Persistent access | Creates hidden admin user |
-| **dos** | 80% | Disable system | Writes `0` to power control file |
-| **priv-esc** | 40% | Get root | Sets `current_uid = 0` |
-| **zero-day** | 90% | Full compromise | Multi-stage attack combining all |
-
-### Malware Scripts (REAL PooScript Files!)
-
-All malware is **actual executable code** in `/scripts/malware/`:
-
-| Malware | File | What It Does |
-|---------|------|--------------|
-| **Worm** | `worm.poo` | Self-replicates, damages all systems |
-| **Virus** | `virus.poo` | Spreads between systems |
-| **Logic Bomb** | `logic_bomb.poo` | Delayed destruction (10sec countdown) |
-| **Trojan** | `trojan.poo` | Steals data silently |
-| **Rootkit** | `rootkit.poo` | Hides presence, persistent access |
-| **Ransomware** | `ransomware.poo` | Encrypts enemy systems |
-
-**Example - worm.poo (REAL PooScript):**
-```python
-#!/usr/bin/pooscript
-# Self-replicating worm
-
-print("🐛 WORM ACTIVATED")
-
-systems = ["weapons", "shields", "engines", "reactor"]
-for system in systems:
-    # Read current health
-    health_path = f"/sys/ship/systems/{system}/health"
-    fd = kernel.open(health_path, kernel.O_RDONLY)
-    current = int(kernel.read(fd, 16).decode('utf-8'))
-    kernel.close(fd)
-
-    # Damage it
-    new_health = max(0, current - 10)
-    fd = kernel.open(health_path, kernel.O_WRONLY)
-    kernel.write(fd, str(new_health).encode('utf-8'))
-    kernel.close(fd)
-
-    print(f"✓ Damaged {system}: {current}% → {new_health}%")
-
-# Self-replicate
-os.system("cp $0 /tmp/.worm_replica.poo")
-print("✓ Replicated to /tmp/")
-```
-
-**This code ACTUALLY RUNS on enemy ships and modifies their files!**
-
----
-
-## 🚀 Quick Start Guide
-
-### Install
-```bash
-# Clone repo
-git clone https://github.com/ruapotato/SpaceCMD.git
-cd SpaceCMD
-
-# Install dependencies
-pip install pygame  # For GUI mode
-
-# Run game
-./play_hacker_mode.sh
-```
-
-### Play Modes
-```bash
-# 1. GUI Mode (Easy - Learn the game)
-python3 play.py
-
-# 2. Console Mode (Normal - Master commands)
-python3 play.py --no-gui --console --ship kestrel
-
-# 3. Watch Demos
-python3 test_hacker_ftl.py        # Hacker gameplay demo
-python3 test_real_hacking.py      # Real PooScript demo
-```
-
----
-
-## 📖 Complete Command Reference
-
-### Ship Management
-```bash
-status              # Full ship status
-systems             # List all systems
-crew                # Crew roster
-power <sys> <n>     # Allocate power to system
-assign <crew> <room>  # Assign crew to room
-```
-
-### Traditional Combat (FTL-Style)
-```bash
-target <system>     # Aim weapons at enemy system
-fire <n>            # Fire weapon number N
-weapons             # List weapons + charge status
-enemy               # Enemy ship information
-```
-
-### Network Hacking (Unique to SpaceCMD!)
-```bash
-nmap                # Port scan enemy ship
-scan                # Vulnerability scanner
-exploit <type> [sys]  # Execute exploit
-hack <type> [sys]   # Quick exploit shortcut
-malware <type> [sys]  # Deploy malware
-ssh-enemy <user>    # SSH into enemy ship
-upload-malware <type>  # Upload PooScript malware
-hacks               # Show active operations
-```
-
-### ShipOS / Filesystem
-```bash
-ls /systems/        # List ship systems
-cat /ship/hull      # Read hull integrity
-echo 4 > /systems/shields/power  # Set shield power
-cat /proc/ship/status  # Complete status
-cat /proc/ship/combat  # Combat state
-pooscript script.poo   # Execute PooScript
-```
-
-### Galaxy Navigation
-```bash
-jump <node_id>      # FTL jump to node
-cat /proc/ship/location  # Current position
-cat /proc/ship/sensors   # Nearby POIs
-cat /proc/ship/pois      # Points of interest
-```
-
----
-
-## 🎯 Example Combat Scenarios
-
-### Manual Combat (GUI/Console - Early Game)
-```bash
-# Turn 1: Recon
-Nautilus> scan
-[HIGH] Buffer overflow in enemy weapons
-
-# Turn 2: Hack
-Nautilus [COMBAT]> exploit buffer-overflow weapons
-✓ Enemy weapons crashed!
-
-# Turn 3: Deploy malware
-Nautilus [COMBAT]> malware worm shields
-🦠 Worm damaging shields over time...
-
-# Turn 4-5: Fire
-Nautilus [COMBAT]> target shields
-Nautilus [COMBAT]> fire 1
-⚡ Hit! Shields 50%
-
-Nautilus [COMBAT]> fire 1
-💥 Enemy destroyed! +50 scrap
-```
-
-### Automated Combat (PooScript - Required for Late Game)
-```python
-#!/usr/bin/pooscript
-# full_automation.poo
-
-import os, time
-
-print("🤖 FULL COMBAT AUTOMATION")
-
-# Multi-stage network attack
-def network_assault():
-    os.system("nmap")
-    os.system("scan")
-    os.system("exploit dos weapons")      # Stop shooting
-    os.system("exploit dos shields")      # Drop shields
-    os.system("upload-malware worm")      # Constant damage
-    os.system("upload-malware logic_bomb weapons")  # Time bomb
-
-# Automated firing
-def auto_fire():
-    os.system("target shields")
-
-    while True:
-        # Check weapon ready
-        fd = kernel.open("/proc/ship/weapons", kernel.O_RDONLY)
-        w = kernel.read(fd, 4096).decode('utf-8')
-        kernel.close(fd)
-
-        if "READY" in w:
-            os.system("fire 1")
-
-        # Check enemy status
-        fd = kernel.open("/proc/ship/enemy", kernel.O_RDONLY)
-        e = kernel.read(fd, 4096).decode('utf-8')
-        kernel.close(fd)
-
-        if "destroyed" in e.lower() or "No combat" in e:
-            break
-
-        time.sleep(0.5)
-
-# Execute
-network_assault()
-auto_fire()
-print("✓ VICTORY")
-```
-
----
-
-## 🏆 Why PooScript Automation Is REQUIRED
-
-### Early Game (Sectors 1-3)
-- ✅ Manual play works fine
-- ✅ Enemies are slow
-- ✅ Simple tactics sufficient
-
-### Mid Game (Sectors 4-6)
-- ⚠️ Enemies get faster
-- ⚠️ Manual play becomes difficult
-- ✅ Basic scripts help a lot
-
-### Late Game (Sectors 7-8)
-- ❌ Manual play nearly impossible
-- ❌ Enemies attack instantly
-- ✅ Automation required
-- ✅ Scripts are the only way
-
-### Final Boss (Rebel Flagship)
-- ❌ **IMPOSSIBLE WITHOUT AUTOMATION**
-- The flagship has:
-  - 4 weapons firing simultaneously
-  - Automated repair drones
-  - System redundancy
-  - Shield regeneration
-  - Advanced AI
-- You need:
-  - Multi-target hacking
-  - Auto-repair systems
-  - Malware automation
-  - Weapon automation
-  - **100% scripted combat**
-
-**Manual play will not work. You must learn PooScript to win.**
-
----
-
-## 📚 Learning Path (Beginner → Expert)
-
-### Week 1: Learn the Game (GUI Mode)
-1. Launch GUI mode
-2. Complete tutorial
-3. Learn ship systems
-4. Fight enemies manually
-5. Reach sector 3
-
-### Week 2: Master Commands (Console Mode)
-1. Switch to console mode
-2. Learn all commands
-3. Practice hacking
-4. Try different ships
-5. Reach sector 5
-
-### Week 3: Basic Automation (PooScript)
-1. Study `/scripts/bin/*` examples
-2. Write first script:
-   ```python
-   #!/usr/bin/pooscript
-   print("My first script!")
-   os.system("status")
-   ```
-3. Create auto-repair script
-4. Build auto-fire script
-5. Reach sector 6
-
-### Week 4: Advanced Hacking
-1. Study `/scripts/malware/*.poo`
-2. Write custom exploits
-3. Create malware variants
-4. Build multi-stage attacks
-5. Reach sector 7
-
-### Week 5: Full Automation
-1. Combine all skills
-2. Create master combat AI
-3. Automate everything
-4. Beat sector 8
-5. **Face the final boss**
-
-### Week 6: VICTORY
-1. Deploy full automation
-2. Multi-threaded attacks
-3. Advanced AI tactics
-4. **Defeat the Rebel Flagship**
-5. **WIN THE GAME!**
-
----
-
-## 🎓 PooScript Examples
-
-### Auto-Fire Script
-```python
-#!/usr/bin/pooscript
-# auto_fire.poo - Automatically fire when ready
-
-import time
-
-while True:
-    fd = kernel.open("/proc/ship/weapons", kernel.O_RDONLY)
-    weapons = kernel.read(fd, 4096).decode('utf-8')
-    kernel.close(fd)
-
-    if "READY" in weapons:
-        os.system("fire 1")
-        print("⚡ Auto-fired weapon 1")
-
-    time.sleep(1)
-```
-
-### Auto-Repair Script
-```python
-#!/usr/bin/pooscript
-# auto_repair.poo - Repair critical systems
-
-while True:
-    # Check all systems
-    fd = kernel.open("/proc/ship/status", kernel.O_RDONLY)
-    status = kernel.read(fd, 4096).decode('utf-8')
-    kernel.close(fd)
-
-    # If any system < 50% health, repair
-    if "health: 49%" in status or "health: 4" in status:
-        os.system("repair")
-        print("🔧 Auto-repair activated")
-
-    time.sleep(2)
-```
-
-### Full Combat AI
-```python
-#!/usr/bin/pooscript
-# combat_ai.poo - Complete combat automation
-
-import os, time
-
-def combat_ai():
-    # Phase 1: Recon
-    os.system("scan")
-
-    # Phase 2: Disable threats
-    os.system("exploit dos weapons")
-    os.system("exploit dos shields")
-
-    # Phase 3: Deploy malware
-    os.system("upload-malware worm")
-    os.system("upload-malware logic_bomb weapons")
-
-    # Phase 4: Attack
-    os.system("target shields")
-
-    # Phase 5: Auto-fire loop
-    while True:
-        fd = kernel.open("/proc/ship/weapons", kernel.O_RDONLY)
-        w = kernel.read(fd, 4096).decode('utf-8')
-        kernel.close(fd)
-
-        if "READY" in w:
-            os.system("fire 1")
-
-        fd = kernel.open("/proc/ship/enemy", kernel.O_RDONLY)
-        e = kernel.read(fd, 4096).decode('utf-8')
-        kernel.close(fd)
-
-        if "destroyed" in e.lower():
-            print("✓ VICTORY")
-            break
-
-        time.sleep(0.5)
-
-combat_ai()
-```
-
----
-
-## 🌟 What Makes SpaceCMD Unique
-
-### Traditional Space Games:
-```
-Click "Fire" → Enemy takes damage → Repeat → Win
-```
-
-### SpaceCMD:
-```
-1. nmap           → Port scan finds SSH open
-2. scan           → Buffer overflow detected
-3. exploit        → Crash enemy weapons
-4. upload worm    → Deploy PooScript malware
-5. ssh-enemy      → Get root shell
-6. execute code   → Run commands on enemy ship
-7. fire weapons   → Finish weakened enemy
-8. WIN            → You hacked their ship with REAL code!
-```
-
-### Unique Features:
-- ✅ **Real programming required** - PooScript is mandatory
-- ✅ **Actual exploit execution** - Modify real files
-- ✅ **True malware** - Executable PooScript scripts
-- ✅ **Network simulation** - Real IPs, ports, services
-- ✅ **Complete filesystem** - Unix-like OS
-- ✅ **Automation mandatory** - Can't win without scripts
-- ✅ **Educational** - Learn hacking + programming
-- ✅ **Three difficulty modes** - GUI → Console → PooScript
-- ✅ **Hackable enemy AI** - Enemy scripts can be stolen
-- ✅ **No Python game logic** - Everything is PooScript
-
----
-
-## 📁 Project Structure
-
-```
-SpaceCMD/
-├── play.py                    # Main launcher
-├── game.py                    # Roguelike story mode
-├── play_hacker_mode.sh        # Quick launcher script
+SpaceCMD/                    (Godot project root)
 ├── core/
-│   ├── ship.py               # Ship classes + network config
-│   ├── ship_os.py            # ShipOS kernel
-│   ├── combat.py             # Combat engine + hacking
-│   ├── hacking.py            # Hacking system
-│   ├── network_combat.py     # Real PooScript exploits
-│   ├── world_manager.py      # Galaxy + encounters
-│   ├── game.py               # Game loop
-│   └── gui/                  # Desktop environment
-├── scripts/
-│   ├── bin/                  # Commands (all PooScript)
-│   │   ├── nmap             # Port scanner
-│   │   ├── scan             # Vulnerability scanner
-│   │   ├── exploit          # Exploit execution
-│   │   ├── hack             # Quick hack
-│   │   ├── malware          # Quick malware
-│   │   ├── ssh-enemy        # SSH connection
-│   │   ├── upload-malware   # Malware upload
-│   │   ├── fire             # Fire weapons
-│   │   ├── target           # Target system
-│   │   └── status           # Ship status
-│   └── malware/              # Malware (all PooScript)
-│       ├── worm.poo         # Self-replicating
-│       ├── logic_bomb.poo   # Delayed bomb
-│       ├── virus.poo        # Spreading virus
-│       └── rootkit.poo      # Hidden access
-├── test_hacker_ftl.py        # Hacker demo
-├── test_real_hacking.py      # Real exploit demo
-└── docs/
-    ├── README.md             # This file
-    ├── HACKERS_FTL_GUIDE.md  # Detailed hacking guide
-    ├── REAL_HACKING.md       # PooScript exploit system
-    ├── CONSOLE_MODE.md       # Console mode guide
-    ├── QUICKSTART_HACKER.md  # 5-minute tutorial
-    └── PLAY_MODES.md         # All game modes
+│   ├── os/          ✅ VFS (420 lines), Kernel (150 lines)
+│   ├── scripting/   ✅ PooScript (270 lines)
+│   ├── ship/        ✅ Ship, Room, Crew, Weapon classes
+│   ├── combat/      ⏳ Stub created
+│   ├── hacking/     ⏳ Stub created
+│   ├── network/     ⏳ To be implemented
+│   └── galaxy/      ⏳ To be implemented
+├── autoload/        ✅ GameManager stub
+├── tests/           ✅ Test suite created
+├── scripts/ai/      ✅ hostile.poo example
+├── project.godot    ✅ Godot 4.4 config
+└── OG_python_version/  (Original Python implementation)
+```
+
+**Total Code**: ~900 lines of core systems ✅
+
+---
+
+## 🚧 TODO
+
+### Phase 1: Testing & Verification ⚠️ **NEXT**
+- [ ] **Run test suite headless**
+  ```bash
+  cd ~/SpaceCMD
+  ../Godot_v4.4.1-stable_linux.x86_64 --headless tests/test_core_systems.gd
+  ```
+- [ ] Fix any VFS bugs
+- [ ] Fix any PooScript bugs
+- [ ] Fix any Kernel bugs
+- [ ] Verify device handlers work
+
+### Phase 2: Integration
+- [ ] **Device Bridge** (GDScript ↔ PooScript)
+  - Ship state → device file updates
+  - Device writes → ship action callbacks
+  - Bi-directional sync system
+- [ ] **ShipOS Integration** (`core/os/ship_os.gd`)
+  - Combine VFS + PooScript + Kernel
+  - Mount ship devices (/dev/ship/hull, /proc/ship/status)
+  - Auto-spawn init process
+  - Update loop (sync ship state ↔ OS state)
+
+### Phase 3: Ship Systems
+- [ ] **Complete Ship class** (`core/ship/ship.gd`)
+  - Hull, shields, power, resources
+  - Rooms dictionary
+  - Systems dictionary
+  - Crew array
+  - Weapons array
+- [ ] **Room class** (`core/ship/room.gd`)
+  - Position in ship grid
+  - System type (HELM, WEAPONS, ENGINES, etc.)
+  - Power allocation
+  - Health tracking
+  - Fire/breach/venting states
+- [ ] **Crew class** (`core/ship/crew.gd`)
+  - Bot crew members
+  - Skills (helm, weapons, shields, etc.)
+  - Health tracking
+  - Room assignment
+- [ ] **Weapon class** (`core/ship/weapon.gd`)
+  - Damage, cooldown, charge
+  - Range, pierce, missile requirements
+  - Weapon types (laser, beam, missile)
+
+### Phase 4: Multi-Room Ship Generation
+- [ ] **Ship layout generator** (`core/ship/ship_generator.gd`)
+  - Room graph (connectivity)
+  - Programmatic generation (like FTL)
+  - Different ship classes (Kestrel, Stealth Cruiser, etc.)
+- [ ] **3D mesh generation**
+  - Room boxes (walls, floor, ceiling)
+  - Doorways between connected rooms
+  - Terminal positions (helm, weapons, engines)
+  - Airlock locations
+- [ ] **Interior navigation**
+  - Navmesh for bot movement
+  - Door collision/interaction
+  - Room transitions
+
+### Phase 5: Player Bot Controller
+- [ ] **FPS controller** (`scenes/player/player_bot.gd`)
+  - CharacterBody3D
+  - WASD movement
+  - Mouse look
+  - Interact with terminals
+  - Interact with doors
+- [ ] **Terminal interaction**
+  - Raycast to detect terminal
+  - Prompt to access (E key)
+  - Open terminal UI
+  - Connected to ShipOS of current ship
+
+### Phase 6: Terminal UI
+- [ ] **In-world terminal** (`scenes/ui/terminal.gd`)
+  - VT100-style text display
+  - Keyboard input capture
+  - Command history (up/down arrows)
+  - Connected to ShipOS instance
+  - Display stdout/stderr
+- [ ] **Terminal commands**
+  - ls, cd, cat, mkdir
+  - ps, kill
+  - cat /dev/ship/hull
+  - cat /proc/ship/status
+  - pooscript /bin/script.poo
+
+### Phase 7: Enemy AI & Scripts
+- [ ] **Basic enemy AI** (`scripts/ai/hostile.poo`)
+  - Read /proc/ship/weapons
+  - Write to /dev/ship/fire
+  - Auto-targeting logic
+  - Weapon charging checks
+- [ ] **Advanced AI variants**
+  - `aggressive.poo` - Rush and overwhelm
+  - `defensive.poo` - Shields up, retreat when damaged
+  - `kamikaze.poo` - Ram player ship
+  - `coward.poo` - Run away immediately
+- [ ] **AI process spawning**
+  - Auto-spawn on ship creation
+  - Different AI per ship type
+  - Boss ships with multi-stage AI
+
+### Phase 8: Combat System
+- [ ] **Combat state** (`core/combat/combat_state.gd`)
+  - Turn-based or real-time?
+  - Weapon firing logic
+  - Damage calculation
+  - Shield mechanics
+  - System damage
+- [ ] **3D combat visuals**
+  - Projectile spawning
+  - Weapon firing effects
+  - Shield hit effects
+  - Explosion effects
+  - Hull damage visuals
+
+### Phase 9: Hacking System
+- [ ] **Network exploits** (`core/hacking/hacking_system.gd`)
+  - Exploit types (buffer overflow, zero-day, backdoor)
+  - Range-based connection
+  - Temporary SSH access
+  - Connection drops if too far
+- [ ] **Exploit laser weapon**
+  - 3D projectile
+  - On hit: grant OS access
+  - Duration timer
+  - Range limits
+- [ ] **Physical boarding**
+  - Airlock docking
+  - Load enemy ship interior
+  - Navigate to helm
+  - Access terminal → full control
+
+### Phase 10: Galaxy & World
+- [ ] **Galaxy manager** (`core/galaxy/galaxy.gd`)
+  - 1D linear galaxy (distance from center)
+  - POI system (stores, encounters, nebulas)
+  - Difficulty scaling
+- [ ] **Ship spawning**
+  - Random enemy ships
+  - Different factions
+  - Boss encounters
+- [ ] **FTL travel**
+  - Jump between locations
+  - Dark matter fuel cost
+  - Encounters along the way
+
+### Phase 11: 3D Flight & Dogfighting
+- [ ] **Player ship 3D** (`scenes/space/player_ship.tscn`)
+  - Ship mesh
+  - Engine trail particles
+  - Weapon hardpoints
+- [ ] **Flight controls**
+  - WASD thrust
+  - Mouse look for aiming
+  - Space for primary fire
+  - Shift for boost
+- [ ] **Manual targeting**
+  - Crosshair in 3D space
+  - Lead indicator
+  - Range indicators
+  - Auto-targeting (shorter range)
+
+### Phase 12: Polish & Effects
+- [ ] **Sound effects**
+  - Weapon firing
+  - Explosions
+  - Shield hits
+  - Engine sounds
+  - Terminal beeps
+- [ ] **Particle effects**
+  - Engine trails
+  - Weapon shots
+  - Explosions
+  - Shield impacts
+- [ ] **UI/HUD**
+  - Ship status display
+  - Weapon charge bars
+  - Target info
+  - Minimap
+- [ ] **Galaxy map**
+  - Visual representation
+  - POI markers
+  - Current location
+  - Jump destinations
+
+---
+
+## 🧪 Testing
+
+### Headless Tests (Core Systems)
+```bash
+# Navigate to project root
+cd ~/SpaceCMD
+
+# Run test suite (no graphics needed)
+../Godot_v4.4.1-stable_linux.x86_64 --headless tests/test_core_systems.gd
+```
+
+**Tests**:
+- ✅ VFS operations (mkdir, create, read, write, devices)
+- ✅ PooScript execution (spawn, kill, ps)
+- ✅ Kernel syscalls (open, read, write, close)
+
+### Expected Output
+```
+============================================================
+SPACECMD CORE SYSTEMS TEST
+============================================================
+
+[TEST 1: VFS]
+✓ VFS created
+✓ Root directory exists
+✓ Created /test directory
+✓ Created /test/hello.txt
+✓ Read file contents: Hello from VFS!
+✓ Listed directory, found 3 entries
+✓ Device file works: Device data
+✅ VFS: ALL TESTS PASSED
+
+[TEST 2: PooScript]
+✓ PooScript created
+✓ Created test script
+[PID 2] Hello from PooScript!
+[PID 2] Sum: 30
+✓ Spawned script with PID: 2
+✓ Process found in table
+✓ ps() returned 1 process(es)
+  PID: 2 CMD: /test_script.poo STATE: RUNNING
+✓ Killed process 2
+✓ Process state is STOPPED
+✅ PooScript: ALL TESTS PASSED
+
+[TEST 3: Kernel]
+✓ Kernel created
+✓ Opened file with FD: 3
+✓ Read data: Kernel test data
+✓ Closed file
+✓ Wrote 8 bytes
+✓ Verified written data: New data
+✓ stat() returned size: 8
+✓ Created directory via kernel
+✓ readdir() returned 13 entries
+✅ Kernel: ALL TESTS PASSED
+
+============================================================
+ALL TESTS COMPLETE
+============================================================
 ```
 
 ---
 
-## 🏅 Achievements
+## 🎯 Key Architecture Decisions
 
-- [ ] Complete tutorial
-- [ ] Win first combat
-- [ ] Reach sector 3 (manual play)
-- [ ] Reach sector 5 (console mode)
-- [ ] Write first PooScript
-- [ ] Deploy all malware types
-- [ ] Get root on 10 enemy ships
-- [ ] Win combat using only hacking
-- [ ] Create automated combat script
-- [ ] Reach sector 7 (automation)
-- [ ] Beat final boss (full automation)
-- [ ] **WIN THE GAME!**
+### 1. PooScript = GDScript
+**Decision**: Use GDScript itself as PooScript execution engine
 
----
+**Why**:
+- No need to write Python interpreter in GDScript
+- Dynamic script loading/execution built-in
+- Full Godot integration
+- Still wraps scripts in process isolation
 
-## 💡 Pro Tips
+**How**:
+```gdscript
+# Enemy AI writes a PooScript
+var ai_code = """
+while true:
+    # Fire weapons
+    var fd = kernel.sys_open(pid, "/dev/ship/fire", O_WRONLY)
+    kernel.sys_write(fd, b"0")
+    sleep(1.0)
+"""
 
-1. **Start with GUI** - Learn the game visually
-2. **Practice in Console** - Master all commands
-3. **Learn PooScript early** - You'll need it
-4. **Automate incrementally** - One system at a time
-5. **Study examples** - Read `/scripts/bin/*` and `/scripts/malware/*`
-6. **Test scripts** - Debug before combat
-7. **Save often** - PooScript bugs can be fatal
-8. **Network first** - Hack before shooting
-9. **Layer attacks** - Combine exploits + malware + weapons
-10. **AUTOMATE EVERYTHING** - Required to win
+# PooScript wraps it and executes
+var script = GDScript.new()
+script.source_code = wrap_as_process(ai_code, pid)
+script.reload()
+var obj = script.new()
+obj.main()  # Runs in background
+```
+
+### 2. One OS Instance Per Ship
+**Decision**: Each ship gets isolated ShipOS
+
+**Why**:
+- True isolation (no shared state bugs)
+- Can hack into enemy OS
+- Player can board and access different OS
+- Different ships can run different AI
+
+**Implementation**:
+```gdscript
+var player_ship_os = ShipOS.new(player_ship)  # VFS #1
+var enemy_ship_os = ShipOS.new(enemy_ship)    # VFS #2
+
+# Completely isolated!
+```
+
+### 3. Device Files Bridge Reality
+**Decision**: Ship state syncs through device files
+
+**Why**:
+- Unix philosophy ("everything is a file")
+- PooScript can read/write devices
+- GDScript reads devices to render world
+- Clean separation of concerns
+
+**Flow**:
+```
+Enemy AI (PooScript)
+  ↓ write("/dev/ship/fire", "0")
+Device Handler
+  ↓ callback
+GDScript
+  ↓ fire_weapon_3d(0)
+3D World (projectile spawns)
+```
 
 ---
 
 ## 📖 Documentation
 
-- **README.md** (this file) - Complete overview
-- **HACKERS_FTL_GUIDE.md** - Detailed hacking tactics
-- **REAL_HACKING.md** - PooScript exploit guide
-- **CONSOLE_MODE.md** - Console mode reference
-- **QUICKSTART_HACKER.md** - 5-minute quickstart
-- **PLAY_MODES.md** - All game modes explained
+- **README.md** (this file) - Overview and TODO
+- **ARCHITECTURE.md** - Deep dive into design
+- **STATUS.md** - Detailed implementation status
+- **project.godot** - Godot 4.4 project config
 
 ---
 
-## 🎯 The Philosophy
-
-> **"Every ship is a computer.**
-> **Every battle is a network.**
-> **Every captain is a hacker.**
-> **The best programmer wins."**
-
-SpaceCMD isn't just a game. It's a **programming challenge** where:
-- Coding skills give real advantages
-- Automation is required to progress
-- PooScript knowledge equals power
-- The final boss cannot be beaten manually
-- **Programming skill = victory**
-
-You're not playing a hacker.
-**You ARE a hacker.**
-
----
-
-## 🚀 Get Started Now
+## 🚀 Getting Started (After Tests Pass)
 
 ```bash
-# Quick start
-./play_hacker_mode.sh
+# 1. Navigate to project root
+cd ~/SpaceCMD
 
-# Or choose your mode:
-python3 play.py                    # GUI (Easy - Learn)
-python3 play.py --no-gui --console # Console (Normal - Master)
-# Write PooScript                  # Required to WIN
+# 2. Run tests
+../Godot_v4.4.1-stable_linux.x86_64 --headless tests/test_core_systems.gd
+
+# 3. Open in Godot editor
+../Godot_v4.4.1-stable_linux.x86_64 --editor .
+
+# 4. (Later) Play the game
+# Press F5 in Godot editor
 ```
 
 ---
 
-## 📝 Remember
+## 🎮 Gameplay Vision
 
-1. **GUI Mode** → Learn the game mechanics
-2. **Console Mode** → Master all commands
-3. **PooScript Mode** → **REQUIRED TO WIN**
-
-**You cannot beat the final boss without automation.**
-**Start learning PooScript today!**
-
----
-
-**Welcome to SpaceCMD.**
-**Hack the planet. Hack the galaxy.** 💻🚀
+1. **Start**: You're a bot on your ship. Walk to helm.
+2. **Flight**: Access terminal, enter flight mode (3D space).
+3. **Encounter**: Enemy ship appears (running hostile.poo AI).
+4. **Combat**: Traditional dogfight OR...
+5. **Hack**: Buy exploit, fire laser, SSH into enemy OS.
+6. **Disable**: `ps aux` → `kill 42` → enemy AI dies.
+7. **Board**: Dock, enter their ship, reach helm, take full control.
+8. **Control**: Upload friendly.poo, enemy joins your fleet!
 
 ---
 
-*Made with ❤️ by hackers, for hackers*
+## 🔥 What Makes This Special
 
-*"The game that teaches you to automate or die"*
+- ✅ **Real OS per ship** - Not fake, actual VFS with processes
+- ✅ **Hackable AI** - Kill enemy processes to disable AI
+- ✅ **Physical boarding** - Walk through ships in 3D
+- ✅ **Scriptable** - Add your own AI/automation
+- ✅ **Two attack vectors** - Network exploits OR physical boarding
+- ✅ **Range-based hacking** - Maintain connection or lose access
+- ✅ **Fully moddable** - Add new AI scripts easily
+
+---
+
+## 📝 Current Sprint: Phase 1 Testing
+
+**Goal**: Verify core systems work correctly
+
+**Tasks**:
+1. Run test suite
+2. Fix any bugs
+3. Document test results
+4. Move to Phase 2 (Device Bridge)
+
+**Status**: ⏳ Ready to test
+
+---
+
+## 💡 Contributing
+
+This is a demonstration project. Core systems are built, now building the 3D layer on top!
+
+**Want to help?**
+- Test the core systems
+- Report bugs
+- Suggest AI behaviors
+- Design ship layouts
+- Create PooScript malware scripts
+
+---
+
+**Status**: Core OS complete, building spaceship! 🚀
+
+*"Every ship is a computer. Every computer can be hacked."*

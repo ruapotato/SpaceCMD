@@ -1,0 +1,30 @@
+# hostile.poo - Basic enemy AI
+# This script runs on enemy ships and controls their behavior
+# Player can kill this process (PID) to disable enemy AI!
+
+print_poo("🔴 HOSTILE AI ACTIVATED")
+print_poo("Target: Player ship")
+
+# Main AI loop
+var tick_count = 0
+
+while true:
+	tick_count += 1
+
+	# Every 2 seconds, attempt to fire weapons
+	if tick_count % 4 == 0:
+		print_poo("Attempting to fire weapons...")
+		# TODO: Write to /dev/ship/fire device
+		# TODO: Read from /proc/ship/weapons to check if ready
+
+	# Every 5 seconds, check own systems
+	if tick_count % 10 == 0:
+		print_poo("System check...")
+		# TODO: Read from /proc/ship/status
+
+	# Sleep 0.5 seconds between ticks
+	sleep(0.5)
+
+# If loop exits, AI is disabled
+print_poo("AI TERMINATED")
+return 0
