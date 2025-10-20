@@ -127,6 +127,10 @@ func _start_process(process: Process, args: Array, env: Dictionary) -> void:
 
 	process.script_obj = obj
 
+	# Set kernel interface on the script object
+	if kernel_interface:
+		obj.set("kernel", kernel_interface)
+
 	# Execute main() if exists
 	if obj.has_method("main"):
 		# Run in deferred mode (non-blocking)
@@ -145,24 +149,24 @@ func _wrap_pooscript(code: String, pid: int, args: Array, env: Dictionary) -> St
 extends RefCounted
 
 # PooScript runtime environment
-var pid: int = %d
-var args: Array = %s
-var env: Dictionary = %s
+var pid: int = {pid}
+var args: Array = {args}
+var env: Dictionary = {env}
 var vfs = null
 var kernel = null
 
 # Built-in functions
 func print_poo(msg: String) -> void:
-	print("[PID %d] " + msg)
+	print("[PID {pid}] " + msg)
 
 func sleep(seconds: float) -> void:
 	OS.delay_msec(int(seconds * 1000))
 
 # User code
 func main() -> int:
-%s
+{code}
 	return 0
-""" % [pid, str(args), str(env), _indent_code(code, 1)]
+""".format({"pid": pid, "args": str(args), "env": str(env), "code": _indent_code(code, 1)})
 
 	return wrapped
 
@@ -176,7 +180,7 @@ func _indent_code(code: String, tabs: int) -> String:
 	return result
 
 ## Kill a process
-func kill(pid: int, signal: int = 15) -> bool:
+func kill_process(pid: int, sig: int = 15) -> bool:
 	if not processes.has(pid):
 		return false
 
@@ -187,7 +191,7 @@ func kill(pid: int, signal: int = 15) -> bool:
 
 	# Stop execution
 	process.state = ProcessState.STOPPED
-	process.exit_code = 128 + signal
+	process.exit_code = 128 + sig
 
 	# Clean up script instance
 	if process.script_obj:

@@ -5,6 +5,10 @@ class_name Ship extends RefCounted
 var ship_name: String = ""
 var ship_class: String = ""
 
+# Convenience alias for combat system
+var name: String:
+	get: return ship_name
+
 # Resources
 var hull: float = 30.0
 var hull_max: float = 30.0
@@ -24,11 +28,17 @@ var systems: Dictionary = {}  # SystemType -> ShipSystem
 var crew: Array[Crew] = []
 var weapons: Array[Weapon] = []
 
-# Galaxy position
+# Galaxy position (1D for map navigation)
 var galaxy_position: float = 800.0
 var velocity: float = 0.0
 var is_traveling: bool = false
 var target_position: float = 0.0
+
+# Combat position (3D for battle space)
+var position: Vector3 = Vector3.ZERO
+
+# Ship OS (one per ship)
+var os: ShipOS = null
 
 func _init(p_name: String, p_class: String) -> void:
 	ship_name = p_name

@@ -32,13 +32,13 @@ func test_vfs() -> void:
 	print("✓ Root directory exists")
 
 	# Create a directory
-	var success = vfs.mkdir("/test", 0o755, 0, 0, VFS.ROOT_INO)
+	var success = vfs.mkdir("/test", 0x1ED, 0, 0, VFS.ROOT_INO)
 	assert(success, "mkdir should succeed")
 	print("✓ Created /test directory")
 
 	# Create a file
 	var content = "Hello from VFS!".to_utf8_buffer()
-	var inode = vfs.create_file("/test/hello.txt", 0o644, 0, 0, content, VFS.ROOT_INO)
+	var inode = vfs.create_file("/test/hello.txt", 0x1A4, 0, 0, content, VFS.ROOT_INO)
 	assert(inode != null, "File creation should succeed")
 	print("✓ Created /test/hello.txt")
 
@@ -81,7 +81,7 @@ print_poo("Sum: " + str(x + y))
 return 0
 """.to_utf8_buffer()
 
-	vfs.create_file("/test_script.poo", 0o755, 0, 0, script_content, VFS.ROOT_INO)
+	vfs.create_file("/test_script.poo", 0x1ED, 0, 0, script_content, VFS.ROOT_INO)
 	print("✓ Created test script")
 
 	# Spawn the script
@@ -105,7 +105,7 @@ return 0
 		print("  PID: ", p.pid, " CMD: ", p.cmd, " STATE: ", p.state)
 
 	# Test kill
-	var killed = pooscript.kill(pid, 15)
+	var killed = pooscript.kill_process(pid, 15)
 	assert(killed, "Kill should succeed")
 	print("✓ Killed process ", pid)
 
@@ -126,7 +126,7 @@ func test_kernel() -> void:
 
 	# Create test file
 	var test_content = "Kernel test data".to_utf8_buffer()
-	vfs.create_file("/kernel_test.txt", 0o644, 0, 0, test_content, VFS.ROOT_INO)
+	vfs.create_file("/kernel_test.txt", 0x1A4, 0, 0, test_content, VFS.ROOT_INO)
 
 	var pid = 100  # Fake PID for testing
 
@@ -164,7 +164,7 @@ func test_kernel() -> void:
 	print("✓ stat() returned size: ", stat_info.size)
 
 	# Test mkdir
-	var mkdir_result = kernel.sys_mkdir(pid, "/kernel_dir", 0o755)
+	var mkdir_result = kernel.sys_mkdir(pid, "/kernel_dir", 0x1ED)
 	assert(mkdir_result == 0, "mkdir should succeed")
 	print("✓ Created directory via kernel")
 

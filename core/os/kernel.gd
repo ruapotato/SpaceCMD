@@ -22,7 +22,7 @@ func _init(p_vfs: VFS) -> void:
 	vfs = p_vfs
 
 ## sys_open - Open file and return file descriptor
-func sys_open(pid: int, path: String, flags: int = O_RDONLY, mode: int = 0o644) -> int:
+func sys_open(pid: int, path: String, flags: int = O_RDONLY, mode: int = 0x1A4) -> int:
 	# Ensure process has fd table
 	if not file_descriptors.has(pid):
 		file_descriptors[pid] = {
@@ -124,7 +124,7 @@ func sys_stat(pid: int, path: String) -> Dictionary:
 	}
 
 ## sys_mkdir - Create directory
-func sys_mkdir(pid: int, path: String, mode: int = 0o755) -> int:
+func sys_mkdir(pid: int, path: String, mode: int = 0x1ED) -> int:
 	if vfs.mkdir(path, mode, 0, 0, VFS.ROOT_INO):
 		return 0
 	else:

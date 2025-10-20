@@ -4,18 +4,18 @@
 class_name VFS extends RefCounted
 
 ## File type constants (mode bits)
-const S_IFMT: int = 0o170000    # File type mask
-const S_IFREG: int = 0o100000   # Regular file
-const S_IFDIR: int = 0o040000   # Directory
-const S_IFCHR: int = 0o020000   # Character device
-const S_IFBLK: int = 0o060000   # Block device
-const S_IFLNK: int = 0o120000   # Symbolic link
+const S_IFMT: int = 0xF000    # File type mask
+const S_IFREG: int = 0x8000   # Regular file
+const S_IFDIR: int = 0x4000   # Directory
+const S_IFCHR: int = 0x2000   # Character device
+const S_IFBLK: int = 0x6000   # Block device
+const S_IFLNK: int = 0xA000   # Symbolic link
 
 ## Permission bits
-const S_IRWXU: int = 0o700      # User RWX
-const S_IRUSR: int = 0o400      # User read
-const S_IWUSR: int = 0o200      # User write
-const S_IXUSR: int = 0o100      # User execute
+const S_IRWXU: int = 0x1C0      # User RWX
+const S_IRUSR: int = 0x100      # User read
+const S_IWUSR: int = 0x80      # User write
+const S_IXUSR: int = 0x40      # User execute
 
 ## Inode class - represents a file system object
 class Inode extends RefCounted:
@@ -83,7 +83,7 @@ func _init() -> void:
 func _create_root() -> void:
 	var root: Inode = Inode.new()
 	root.ino = 1
-	root.mode = S_IFDIR | 0o755
+	root.mode = S_IFDIR | 0x1ED
 	root.uid = 0
 	root.gid = 0
 	root.content = {".": 1, "..": 1}
@@ -113,7 +113,7 @@ func _create_base_directories() -> void:
 	]
 
 	for dir_path in dirs:
-		mkdir(dir_path, 0o755, 0, 0, ROOT_INO)
+		mkdir(dir_path, 0x1ED, 0, 0, ROOT_INO)
 
 ## Resolve path to inode number
 ## Returns inode number or -1 if not found
@@ -174,6 +174,10 @@ func stat(path: String, cwd_ino: int = ROOT_INO) -> Inode:
 		return null
 	return inodes.get(ino)
 
+## path_exists - Check if path exists
+func path_exists(path: String, cwd_ino: int = ROOT_INO) -> bool:
+	return _resolve_path(path, cwd_ino) >= 0
+
 ## mkdir - Create directory
 func mkdir(path: String, mode: int, uid: int, gid: int, cwd_ino: int = ROOT_INO) -> bool:
 	# Split path into parent and name
@@ -202,7 +206,7 @@ func mkdir(path: String, mode: int, uid: int, gid: int, cwd_ino: int = ROOT_INO)
 	var new_inode: Inode = Inode.new()
 	new_inode.ino = next_ino
 	next_ino += 1
-	new_inode.mode = S_IFDIR | (mode & 0o777)
+	new_inode.mode = S_IFDIR | (mode & 0x1FF)
 	new_inode.uid = uid
 	new_inode.gid = gid
 	new_inode.content = {
@@ -247,7 +251,7 @@ func create_file(path: String, mode: int, uid: int, gid: int, content: PackedByt
 	var new_inode: Inode = Inode.new()
 	new_inode.ino = next_ino
 	next_ino += 1
-	new_inode.mode = S_IFREG | (mode & 0o777)
+	new_inode.mode = S_IFREG | (mode & 0x1FF)
 	new_inode.uid = uid
 	new_inode.gid = gid
 	new_inode.content = content
@@ -281,7 +285,7 @@ func create_device(path: String, char_device: bool, uid: int, gid: int, device_n
 	var new_inode: Inode = Inode.new()
 	new_inode.ino = next_ino
 	next_ino += 1
-	new_inode.mode = (S_IFCHR if char_device else S_IFBLK) | 0o666
+	new_inode.mode = (S_IFCHR if char_device else S_IFBLK) | 0x1B6
 	new_inode.uid = uid
 	new_inode.gid = gid
 	new_inode.device_name = device_name

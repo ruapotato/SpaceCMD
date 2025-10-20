@@ -1,30 +1,119 @@
-# hostile.poo - Basic enemy AI
-# This script runs on enemy ships and controls their behavior
-# Player can kill this process (PID) to disable enemy AI!
+## Hostile AI - Basic enemy AI that targets and fires at player ships
+## This script runs as a PooScript process and uses device files to control the ship
 
-print_poo("🔴 HOSTILE AI ACTIVATED")
-print_poo("Target: Player ship")
+var WEAPON_RANGE: float = 10.0  # Maximum weapon range
 
-# Main AI loop
-var tick_count = 0
+print('[HOSTILE AI] Starting hostile AI (PID %d)' % pid)
+print('[HOSTILE AI] Initializing combat systems...')
 
-while true:
-	tick_count += 1
+var loop_count = 0
+var max_loops = 100  # Prevent infinite loops in testing
 
-	# Every 2 seconds, attempt to fire weapons
-	if tick_count % 4 == 0:
-		print_poo("Attempting to fire weapons...")
-		# TODO: Write to /dev/ship/fire device
-		# TODO: Read from /proc/ship/weapons to check if ready
+while loop_count < max_loops:
+	loop_count += 1
 
-	# Every 5 seconds, check own systems
-	if tick_count % 10 == 0:
-		print_poo("System check...")
-		# TODO: Read from /proc/ship/status
+	# Step 1: Check sensors for nearby ships
+	var sensors_fd = kernel.sys_open(pid, '/proc/ship/sensors', kernel.O_RDONLY)
+	if sensors_fd < 0:
+		print('[HOSTILE AI] ERROR: Cannot access sensors')
+		return -1
 
-	# Sleep 0.5 seconds between ticks
-	sleep(0.5)
+	var sensors_data = kernel.sys_read(pid, sensors_fd, 4096)
+	kernel.sys_close(pid, sensors_fd)
+	var sensors_str = sensors_data.get_string_from_utf8()
 
-# If loop exits, AI is disabled
-print_poo("AI TERMINATED")
+	# Step 2: Check if we have a target
+	var target_fd = kernel.sys_open(pid, '/dev/ship/target', kernel.O_RDONLY)
+	if target_fd < 0:
+		print('[HOSTILE AI] ERROR: Cannot access target device')
+		return -1
+
+	var target_data = kernel.sys_read(pid, target_fd, 1024)
+	kernel.sys_close(pid, target_fd)
+	var target_str = target_data.get_string_from_utf8()
+
+	# Step 3: If no target, try to acquire one from sensors
+	if "No target selected" in target_str:
+		print('[HOSTILE AI] No target - scanning...')
+
+		# Parse sensor data to find a target
+		# Look for lines like: "  PlayerShip: 5.2 units + (Hull: 30.0/30.0)"
+		var lines = sensors_str.split("\n")
+		for line in lines:
+			if line.contains(":") and line.contains("units"):
+				# Extract ship name (before the first colon)
+				var parts = line.split(":")
+				if parts.size() >= 2:
+					var ship_name = parts[0].strip_edges()
+
+					# Set this as target
+					print('[HOSTILE AI] Acquiring target: %s' % ship_name)
+					var target_write_fd = kernel.sys_open(pid, '/dev/ship/target', kernel.O_WRONLY)
+					if target_write_fd >= 0:
+						kernel.sys_write(pid, target_write_fd, ship_name.to_utf8_buffer())
+						kernel.sys_close(pid, target_write_fd)
+
+						# Re-read target to get the updated info
+						target_fd = kernel.sys_open(pid, '/dev/ship/target', kernel.O_RDONLY)
+						if target_fd >= 0:
+							target_data = kernel.sys_read(pid, target_fd, 1024)
+							kernel.sys_close(pid, target_fd)
+							target_str = target_data.get_string_from_utf8()
+						break
+
+	# Step 4: If we have a target, check distance and engage
+	if not ("No target selected" in target_str):
+		# Parse distance from target info
+		# Format: "Distance: 5.2 units"
+		var distance = -1.0
+		var target_lines = target_str.split("\n")
+		for line in target_lines:
+			if "Distance:" in line:
+				var dist_parts = line.split(":")
+				if dist_parts.size() >= 2:
+					var dist_str = dist_parts[1].strip_edges().split(" ")[0]
+					distance = dist_str.to_float()
+					break
+
+		if distance >= 0:
+			print('[HOSTILE AI] Target distance: %.1f units' % distance)
+
+			# Step 5: Check if in weapon range
+			if distance <= WEAPON_RANGE:
+				print('[HOSTILE AI] Target in range - checking weapons...')
+
+				# Step 6: Check weapon status
+				var weapons_fd = kernel.sys_open(pid, '/proc/ship/weapons', kernel.O_RDONLY)
+				if weapons_fd >= 0:
+					var weapons_data = kernel.sys_read(pid, weapons_fd, 4096)
+					kernel.sys_close(pid, weapons_fd)
+					var weapons_str = weapons_data.get_string_from_utf8()
+
+					# Step 7: Find a ready weapon and fire it
+					var weapon_lines = weapons_str.split("\n")
+					for line in weapon_lines:
+						if "READY" in line and line.contains("["):
+							# Extract weapon index from line like "  [0] Burst Laser: READY (charge: 100%)"
+							var bracket_start = line.find("[")
+							var bracket_end = line.find("]")
+							if bracket_start >= 0 and bracket_end > bracket_start:
+								var weapon_idx_str = line.substr(bracket_start + 1, bracket_end - bracket_start - 1)
+								var weapon_idx = weapon_idx_str.to_int()
+
+								print('[HOSTILE AI] Firing weapon %d!' % weapon_idx)
+								var fire_fd = kernel.sys_open(pid, '/dev/ship/actions/fire', kernel.O_WRONLY)
+								if fire_fd >= 0:
+									kernel.sys_write(pid, fire_fd, str(weapon_idx).to_utf8_buffer())
+									kernel.sys_close(pid, fire_fd)
+								break
+			else:
+				print('[HOSTILE AI] Target out of range (%.1f > %.1f)' % [distance, WEAPON_RANGE])
+		else:
+			print('[HOSTILE AI] Could not determine target distance')
+
+	# Sleep before next iteration (in real game this would be smaller)
+	# For testing, we'll just break after one iteration
+	break
+
+print('[HOSTILE AI] AI cycle complete')
 return 0
