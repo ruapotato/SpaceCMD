@@ -31,56 +31,50 @@ You are a **robot crew member** on a spaceship. Every ship (yours and enemies) r
 
 ## 🎯 NEXT STEPS - IMMEDIATE TODO
 
-### ✅ Phase 6: Procedural Ship Interiors & Bot Control COMPLETE!
+### ✅ Phase 7: Crew Bot System & Movement Commands - COMPLETE!
 
-**Status:** Player can now walk around procedurally generated ship interiors!
+**Status:** Multi-bot crew with terminal-based control!
 
 **What's Done:**
-- ✅ **Procedural Room Generation System**
-  - Room types: Helm, Engine, Weapons, Reactor, Repair Bay, Shields, Crew Quarters, Cargo
-  - Grid-based layout generator
-  - Automatic room connections and doorways
-  - Configurable ship sizes (basic or random layouts)
+- ✅ **Bot Class System**
+  - Generic Bot class (extends CharacterBody3D)
+  - Autonomous navigation to target rooms
+  - Bot status tracking (current room, moving, target)
+  - 3D visual representation (colored capsule meshes)
+  - Signal-based event system (arrival, movement start)
 
-- ✅ **3D Room Mesh Generator**
-  - Procedural geometry for rooms (floors, ceilings, walls)
-  - Per-room lighting with thematic colors
-  - Collision detection for floors/walls
-  - Doorway placement between connected rooms
+- ✅ **3-Bot Crew**
+  - Player bot (FPS controller in Helm)
+  - Engineer bot (spawns in Engine Room)
+  - Gunner bot (spawns in Weapons Bay)
+  - Each bot has unique ID, name, and color
 
-- ✅ **Player Bot (First-Person Controller)**
-  - FPS movement (WASD)
-  - Mouse look camera
-  - Interaction system (raycast + E key)
-  - Mode switching (3D ↔ Terminal)
+- ✅ **Bot Control Commands (19 total now!)**
+  - **New**: `bots` - List all bots and their locations/status
+  - **New**: `send <bot_id> <room_name>` - Order bot to move to room
+  - Bot commands integrate with ShipOS device files
+  - `/proc/ship/bots` - Read bot status
+  - `/dev/ship/actions/bot` - Write bot movement orders
 
-- ✅ **Room-Specific Consoles**
-  - Helm Console - ship control and navigation
-  - Engine Console - propulsion systems
-  - Weapons Console - weapon control
-  - Reactor Console - power distribution
-  - Each console connects to ShipOS
-
-- ✅ **Terminal UI System**
-  - Fullscreen terminal overlay (press E on console)
-  - Command execution through ShipOS
-  - Command history (arrow keys)
-  - File system access (cat, ls)
-  - Press Escape to return to 3D view
+- ✅ **ShipOS Integration**
+  - Bot management in ShipOS (bots array)
+  - Room tracking system (ship_rooms array)
+  - Device file handlers for bot status/control
+  - Real-time status updates (shows "Moving to..." when in transit)
 
 **What This Means:**
-- 🎉 Players control a **bot** that walks around the ship
-- 🎉 Ships are **procedurally generated** with interconnected rooms
-- 🎉 **Dual-mode gameplay**: Walk around in 3D OR use terminal to hack/control
-- 🎉 **Headless mode still works** - all tests pass, terminal-only gameplay possible
-- 🎉 Ready to add **external 3D combat view** while maintaining interior gameplay
+- 🎉 **Multi-bot gameplay** - 3 crew members total (player + 2 bots)!
+- 🎉 **Terminal bot control** - Command bots from any console
+- 🎉 **Autonomous navigation** - Bots pathfind to rooms automatically
+- 🎉 **Full crew management** - Track and control all crew via OS commands
+- 🎉 **Extensible system** - Easy to add more bots or behaviors
 
-**Next Steps:**
-- Add external ship view (3D combat while flying)
-- Add physical weapon models that fire projectiles
-- Add exterior camera toggle
-- Improve doorway visuals (sliding doors, frames)
-- Add viewport texture to show terminal on console screen
+**Next Steps (Phase 8):**
+- Add bot tasks (repair, operate systems, fight fires)
+- External ship view (3D combat while flying)
+- Improve doorway visuals (frames, lighting)
+- Add crew status visualization in 3D
+- Bot AI behaviors (auto-respond to ship damage)
 
 ---
 
@@ -452,7 +446,7 @@ cd ~/SpaceCMD
 
 ---
 
-## 📝 Current Status: Phase 6 COMPLETE! - Procedural Ship Interiors! 🏗️🤖
+## 📝 Current Status: Phase 7 COMPLETE! - Crew Bot System! 🏗️🤖👥
 
 **Completed Systems:**
 - ✅ Phase 1-3: Core OS, ShipOS, Combat Manager
@@ -466,10 +460,16 @@ cd ~/SpaceCMD
   - Player bot (FPS controller)
   - Terminal UI integration
   - Console interaction system
+- ✅ Phase 7: Crew Bot System
+  - Bot class with autonomous navigation
+  - 3-bot crew (Player, Engineer, Gunner)
+  - Bot control commands (bots, send)
+  - ShipOS integration with bot management
+  - Real-time status tracking
 
-**Total:** 145 tests passing | ~4,500 lines of code
+**Total:** 145+ tests passing | ~5,000 lines of code
 
-**Playable:** Yes! Open in Godot and press F5 to walk around your ship!
+**Playable:** Yes! Open in Godot, press F5, walk around your ship, and command your crew via terminal!
 
 **Next Steps:** See "NEXT STEPS - IMMEDIATE TODO" section at top of README
 
@@ -488,6 +488,6 @@ This is a demonstration project. Core systems are built, now building the 3D lay
 
 ---
 
-**Status**: Phases 1-6 Complete - Playable with Procedural Ship Interiors! 🚀🤖🏗️
+**Status**: Phases 1-7 Complete - Playable with Multi-Bot Crew! 🚀🤖🏗️👥
 
-*"Every ship is a computer. Every battle is data. Every hit is a syscall. Every room is procedural. Every bot is you."*
+*"Every ship is a computer. Every battle is data. Every hit is a syscall. Every room is procedural. Every bot is controllable."*

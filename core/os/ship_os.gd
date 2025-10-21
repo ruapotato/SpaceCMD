@@ -13,6 +13,10 @@ var nearby_ships: Array = []  # Array of Ship objects in sensor range
 var current_target: Ship = null
 var combat_manager = null  # Reference to CombatManager (set externally)
 
+# Bot management (set externally by ship scene)
+var bots: Array = []  # Array of Bot objects
+var ship_rooms: Array = []  # Array of RoomInstance objects
+
 # Device callbacks - these are triggered when PooScript writes to devices
 var device_write_callbacks: Dictionary = {}  # device_path -> Callable
 
@@ -86,7 +90,7 @@ return 0
 """)
 
 	_create_command("help", """# Show available commands
-pprint('Available commands: ls, cat, cd, pwd, echo, help, status, weapons, systems, crew, rooms, sensors, position, target, fire, power, thrust, turn, jump')
+pprint('Available commands: ls, cat, cd, pwd, echo, help, status, weapons, systems, crew, rooms, sensors, position, bots, target, fire, power, thrust, turn, jump, send')
 return 0
 """)
 
@@ -153,6 +157,16 @@ return 1
 
 	_create_command("position", """# Show ship position
 var fd = kernel.sys_open(pid, '/proc/ship/position', kernel.O_RDONLY)
+if fd >= 0:
+	var data = kernel.sys_read(pid, fd, 4096)
+	kernel.sys_close(pid, fd)
+	pprint(data.get_string_from_utf8())
+	return 0
+return 1
+""")
+
+	_create_command("bots", """# Show bot status
+var fd = kernel.sys_open(pid, '/proc/ship/bots', kernel.O_RDONLY)
 if fd >= 0:
 	var data = kernel.sys_read(pid, fd, 4096)
 	kernel.sys_close(pid, fd)
@@ -264,6 +278,25 @@ pprint('Failed to jump')
 return 1
 """)
 
+	_create_command("send", """# Send bot to room
+if args.size() < 2:
+	pprint('Usage: send <bot_id> <room_name>')
+	pprint('Example: send 1 Engine Room')
+	pprint('Use \\'bots\\' to list available bots and their locations')
+	return 1
+var bot_id = args[0]
+var room_name = ' '.join(args.slice(1))
+var cmd = '%s %s' % [bot_id, room_name]
+var fd = kernel.sys_open(pid, '/dev/ship/actions/bot', kernel.O_WRONLY)
+if fd >= 0:
+	kernel.sys_write(pid, fd, cmd.to_utf8_buffer())
+	kernel.sys_close(pid, fd)
+	pprint('Bot %s ordered to move to %s' % [bot_id, room_name])
+	return 0
+pprint('Failed to send bot')
+return 1
+""")
+
 	print("[ShipOS] Populated /bin with commands")
 
 ## Helper to create a command file in /bin
@@ -291,6 +324,7 @@ func _mount_ship_devices() -> void:
 	_mount_device("/proc/ship/rooms", _read_rooms_status, null)
 	_mount_device("/proc/ship/sensors", _read_sensors, null)
 	_mount_device("/proc/ship/position", _read_position, null)
+	_mount_device("/proc/ship/bots", _read_bots_status, null)
 
 	# Read-write target device
 	_mount_device("/dev/ship/target", _read_target, _write_target)
@@ -301,6 +335,7 @@ func _mount_ship_devices() -> void:
 	_mount_device("/dev/ship/actions/target", null, _write_set_target)
 	_mount_device("/dev/ship/actions/jump", null, _write_jump)
 	_mount_device("/dev/ship/actions/power", null, _write_allocate_power)
+	_mount_device("/dev/ship/actions/bot", null, _write_bot_command)
 
 ## Helper to mount a device file
 func _mount_device(path: String, read_handler: Variant, write_handler: Variant) -> void:
@@ -479,6 +514,15 @@ func _read_target(_size: int) -> PackedByteArray:
 	else:
 		return "No target selected\n".to_utf8_buffer()
 
+func _read_bots_status(_size: int) -> PackedByteArray:
+	var status = "Bots (%d):\n" % bots.size()
+	if bots.is_empty():
+		status += "  No bots available\n"
+	else:
+		for bot in bots:
+			status += "  [%d] %s\n" % [bot.bot_id, bot.get_status()]
+	return status.to_utf8_buffer()
+
 #endregion
 
 #region Device Write Handlers (Device writes → Ship actions)
@@ -547,6 +591,44 @@ func _write_allocate_power(data: PackedByteArray) -> int:
 	print("[ShipOS] Power allocation: %s" % power_cmd)
 	# TODO: Parse power allocation command
 	# Format: "weapons:3,shields:2,engines:3"
+	return data.size()
+
+func _write_bot_command(data: PackedByteArray) -> int:
+	var cmd = data.get_string_from_utf8().strip_edges()
+	var parts = cmd.split(" ", false)
+
+	if parts.size() < 2:
+		print("[ShipOS] Invalid bot command format. Use: <bot_id> <room_name>")
+		return -1
+
+	var bot_id = parts[0].to_int()
+	var room_name = " ".join(parts.slice(1))  # Room name may have spaces
+
+	# Find bot
+	var target_bot = null
+	for bot in bots:
+		if bot.bot_id == bot_id:
+			target_bot = bot
+			break
+
+	if not target_bot:
+		print("[ShipOS] Bot %d not found" % bot_id)
+		return -1
+
+	# Find room
+	var target_room = null
+	for room in ship_rooms:
+		if room.get_name().to_lower() == room_name.to_lower():
+			target_room = room
+			break
+
+	if not target_room:
+		print("[ShipOS] Room '%s' not found" % room_name)
+		return -1
+
+	# Send bot to room
+	target_bot.move_to_room(target_room)
+	print("[ShipOS] Bot %d ordered to move to %s" % [bot_id, target_room.get_name()])
 	return data.size()
 
 #endregion

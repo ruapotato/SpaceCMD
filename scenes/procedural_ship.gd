@@ -14,6 +14,7 @@ var generated_ship: Node3D
 var player: PlayerBot
 var ship_os: ShipOS
 var consoles: Array[HelmConsole] = []
+var bots: Array[Bot] = []  # Additional crew bots
 
 func _ready() -> void:
 	# Generate ship layout
@@ -36,12 +37,16 @@ func _ready() -> void:
 	# Spawn player in first room
 	spawn_player()
 
+	# Spawn additional crew bots
+	spawn_crew_bots()
+
 	# Connect terminal UI
 	setup_terminal()
 
 	print("[ProceduralShip] Ship generation complete!")
 	print("  - Rooms: %d" % ship_layout.rooms.size())
 	print("  - Consoles: %d" % consoles.size())
+	print("  - Crew bots: %d" % bots.size())
 
 func create_ship_os() -> void:
 	"""Create ShipOS for this ship"""
@@ -110,6 +115,76 @@ func spawn_player() -> void:
 	add_child(player)
 
 	print("[ProceduralShip] Player spawned in %s at %v" % [spawn_room.get_name(), spawn_pos])
+
+func spawn_crew_bots() -> void:
+	"""Spawn 2 additional crew bots in different rooms"""
+	if ship_layout.rooms.size() < 3:
+		push_error("[ProceduralShip] Not enough rooms for crew bots!")
+		return
+
+	# Bot 1: Spawn in Engine room (or second room)
+	var bot1_room = _find_room_by_type(RoomSystem.RoomType.ENGINE)
+	if not bot1_room and ship_layout.rooms.size() > 1:
+		bot1_room = ship_layout.rooms[1]
+
+	if bot1_room:
+		var bot1 = _create_bot(1, "Engineer", Color(0.8, 0.4, 0.2), bot1_room)
+		bots.append(bot1)
+		add_child(bot1)
+
+	# Bot 2: Spawn in Weapons room (or third room)
+	var bot2_room = _find_room_by_type(RoomSystem.RoomType.WEAPONS)
+	if not bot2_room and ship_layout.rooms.size() > 2:
+		bot2_room = ship_layout.rooms[2]
+
+	if bot2_room:
+		var bot2 = _create_bot(2, "Gunner", Color(0.8, 0.2, 0.2), bot2_room)
+		bots.append(bot2)
+		add_child(bot2)
+
+	# Register bots and rooms with ShipOS
+	if ship_os:
+		ship_os.set("bots", bots)
+		ship_os.set("ship_rooms", ship_layout.rooms)
+
+	print("[ProceduralShip] Spawned %d crew bots" % bots.size())
+
+func _create_bot(id: int, bot_name: String, color: Color, room: RoomSystem.RoomInstance) -> Bot:
+	"""Create and configure a bot"""
+	var bot_scene = load("res://player/bot.tscn")
+	var bot: Bot = bot_scene.instantiate()
+
+	bot.bot_id = id
+	bot.bot_name = bot_name
+	bot.bot_color = color
+
+	# Position bot in room
+	var spawn_pos = room.world_position + Vector3(1.5 + (id * 0.5), 0, 1.5)
+	bot.position = spawn_pos
+	bot.set_current_room(room)
+
+	# Connect signals
+	bot.arrived_at_room.connect(_on_bot_arrived)
+	bot.movement_started.connect(_on_bot_movement_started)
+
+	print("[ProceduralShip] Spawned %s (ID:%d) in %s at %v" % [bot_name, id, room.get_name(), spawn_pos])
+
+	return bot
+
+func _find_room_by_type(type: RoomSystem.RoomType) -> RoomSystem.RoomInstance:
+	"""Find a room by its type"""
+	for room in ship_layout.rooms:
+		if room.type == type:
+			return room
+	return null
+
+func _on_bot_arrived(room: RoomSystem.RoomInstance) -> void:
+	"""Handle bot arrival at room"""
+	print("[ProceduralShip] Bot arrived at %s" % room.get_name())
+
+func _on_bot_movement_started(room: RoomSystem.RoomInstance) -> void:
+	"""Handle bot starting movement"""
+	print("[ProceduralShip] Bot moving to %s" % room.get_name())
 
 func setup_terminal() -> void:
 	"""Setup terminal UI connections"""
