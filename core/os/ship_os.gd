@@ -26,6 +26,7 @@ func _init(p_ship: Ship, p_hostname: String = "") -> void:
 	pooscript.set_kernel(kernel)  # Allow scripts to access kernel syscalls
 
 	_create_directory_structure()
+	_populate_bin_commands()
 	_mount_ship_devices()
 	_spawn_init_process()
 
@@ -34,6 +35,241 @@ func _create_directory_structure() -> void:
 	# VFS already creates base directories, just add /sbin
 	if not vfs.stat("/sbin"):
 		vfs.mkdir("/sbin", 0x1ED, 0, 0)  # 755
+
+## Populate /bin with PooScript commands
+func _populate_bin_commands() -> void:
+	# Basic Unix commands
+	_create_command("ls", """# List directory contents
+var path = args[0] if args.size() > 0 else '/'
+var entries = vfs.list_dir(path)
+if entries.is_empty():
+	pprint('ls: cannot access \\'%s\\': No such directory' % path)
+	return 1
+for entry in entries:
+	var name = entry[0] if entry is Array and entry.size() > 0 else str(entry)
+	pprint(name)
+return 0
+""")
+
+	_create_command("cat", """# Read file contents
+if args.size() == 0:
+	pprint('Usage: cat <filename>')
+	return 1
+var path = args[0]
+var fd = kernel.sys_open(pid, path, kernel.O_RDONLY)
+if fd < 0:
+	pprint('cat: %s: No such file or directory' % path)
+	return 1
+var data = kernel.sys_read(pid, fd, 4096)
+kernel.sys_close(pid, fd)
+pprint(data.get_string_from_utf8())
+return 0
+""")
+
+	_create_command("pwd", """# Print working directory
+pprint(env.get('PWD', '/'))
+return 0
+""")
+
+	_create_command("cd", """# Change directory
+if args.size() == 0:
+	pprint('Usage: cd <directory>')
+	return 1
+var target_dir = args[0]
+pprint('cd: Target %s' % target_dir)
+return 0
+""")
+
+	_create_command("echo", """# Echo arguments
+pprint(' '.join(args))
+return 0
+""")
+
+	_create_command("help", """# Show available commands
+pprint('Available commands: ls, cat, cd, pwd, echo, help, status, weapons, systems, crew, rooms, sensors, position, target, fire, power, thrust, turn, jump')
+return 0
+""")
+
+	# Ship status commands
+	_create_command("status", """# Show ship status
+var fd = kernel.sys_open(pid, '/proc/ship/status', kernel.O_RDONLY)
+if fd >= 0:
+	var data = kernel.sys_read(pid, fd, 4096)
+	kernel.sys_close(pid, fd)
+	pprint(data.get_string_from_utf8())
+	return 0
+return 1
+""")
+
+	_create_command("weapons", """# Show weapons status
+var fd = kernel.sys_open(pid, '/proc/ship/weapons', kernel.O_RDONLY)
+if fd >= 0:
+	var data = kernel.sys_read(pid, fd, 4096)
+	kernel.sys_close(pid, fd)
+	pprint(data.get_string_from_utf8())
+	return 0
+return 1
+""")
+
+	_create_command("systems", """# Show systems status
+var fd = kernel.sys_open(pid, '/proc/ship/systems', kernel.O_RDONLY)
+if fd >= 0:
+	var data = kernel.sys_read(pid, fd, 4096)
+	kernel.sys_close(pid, fd)
+	pprint(data.get_string_from_utf8())
+	return 0
+return 1
+""")
+
+	_create_command("crew", """# Show crew status
+var fd = kernel.sys_open(pid, '/proc/ship/crew', kernel.O_RDONLY)
+if fd >= 0:
+	var data = kernel.sys_read(pid, fd, 4096)
+	kernel.sys_close(pid, fd)
+	pprint(data.get_string_from_utf8())
+	return 0
+return 1
+""")
+
+	_create_command("rooms", """# Show rooms status
+var fd = kernel.sys_open(pid, '/proc/ship/rooms', kernel.O_RDONLY)
+if fd >= 0:
+	var data = kernel.sys_read(pid, fd, 4096)
+	kernel.sys_close(pid, fd)
+	pprint(data.get_string_from_utf8())
+	return 0
+return 1
+""")
+
+	_create_command("sensors", """# Show sensor contacts
+var fd = kernel.sys_open(pid, '/proc/ship/sensors', kernel.O_RDONLY)
+if fd >= 0:
+	var data = kernel.sys_read(pid, fd, 4096)
+	kernel.sys_close(pid, fd)
+	pprint(data.get_string_from_utf8())
+	return 0
+return 1
+""")
+
+	_create_command("position", """# Show ship position
+var fd = kernel.sys_open(pid, '/proc/ship/position', kernel.O_RDONLY)
+if fd >= 0:
+	var data = kernel.sys_read(pid, fd, 4096)
+	kernel.sys_close(pid, fd)
+	pprint(data.get_string_from_utf8())
+	return 0
+return 1
+""")
+
+	# Ship action commands
+	_create_command("target", """# Set combat target
+if args.size() == 0:
+	var fd = kernel.sys_open(pid, '/dev/ship/target', kernel.O_RDONLY)
+	if fd >= 0:
+		var data = kernel.sys_read(pid, fd, 1024)
+		kernel.sys_close(pid, fd)
+		pprint(data.get_string_from_utf8())
+		return 0
+	return 1
+else:
+	var target_name = args[0]
+	var fd = kernel.sys_open(pid, '/dev/ship/target', kernel.O_WRONLY)
+	if fd >= 0:
+		kernel.sys_write(pid, fd, target_name.to_utf8_buffer())
+		kernel.sys_close(pid, fd)
+		pprint('Target set to: %s' % target_name)
+		return 0
+	pprint('Failed to set target')
+	return 1
+""")
+
+	_create_command("fire", """# Fire weapon at target
+if args.size() == 0:
+	pprint('Usage: fire <weapon_index>')
+	return 1
+var weapon_idx = args[0]
+var fd = kernel.sys_open(pid, '/dev/ship/actions/fire', kernel.O_WRONLY)
+if fd >= 0:
+	kernel.sys_write(pid, fd, weapon_idx.to_utf8_buffer())
+	kernel.sys_close(pid, fd)
+	pprint('Firing weapon %s' % weapon_idx)
+	return 0
+pprint('Failed to fire weapon')
+return 1
+""")
+
+	_create_command("power", """# Allocate power to systems
+if args.size() == 0:
+	var fd = kernel.sys_open(pid, '/proc/ship/power_detail', kernel.O_RDONLY)
+	if fd >= 0:
+		var data = kernel.sys_read(pid, fd, 4096)
+		kernel.sys_close(pid, fd)
+		pprint(data.get_string_from_utf8())
+		return 0
+	return 1
+else:
+	var allocation = ' '.join(args)
+	var fd = kernel.sys_open(pid, '/dev/ship/actions/power', kernel.O_WRONLY)
+	if fd >= 0:
+		kernel.sys_write(pid, fd, allocation.to_utf8_buffer())
+		kernel.sys_close(pid, fd)
+		pprint('Power allocated: %s' % allocation)
+		return 0
+	pprint('Failed to allocate power')
+	return 1
+""")
+
+	_create_command("thrust", """# Control ship thrust
+if args.size() == 0:
+	pprint('Usage: thrust <forward|backward|stop|value>')
+	return 1
+var thrust_cmd = args[0]
+var fd = kernel.sys_open(pid, '/dev/ship/actions/thrust', kernel.O_WRONLY)
+if fd >= 0:
+	kernel.sys_write(pid, fd, thrust_cmd.to_utf8_buffer())
+	kernel.sys_close(pid, fd)
+	pprint('Thrust: %s' % thrust_cmd)
+	return 0
+pprint('Failed to set thrust')
+return 1
+""")
+
+	_create_command("turn", """# Control ship turning
+if args.size() == 0:
+	pprint('Usage: turn <left|right|stop|value>')
+	return 1
+var turn_cmd = args[0]
+var fd = kernel.sys_open(pid, '/dev/ship/actions/turn', kernel.O_WRONLY)
+if fd >= 0:
+	kernel.sys_write(pid, fd, turn_cmd.to_utf8_buffer())
+	kernel.sys_close(pid, fd)
+	pprint('Turn: %s' % turn_cmd)
+	return 0
+pprint('Failed to turn')
+return 1
+""")
+
+	_create_command("jump", """# Jump to galaxy position
+if args.size() == 0:
+	pprint('Usage: jump <position>')
+	return 1
+var destination = args[0]
+var fd = kernel.sys_open(pid, '/dev/ship/actions/jump', kernel.O_WRONLY)
+if fd >= 0:
+	kernel.sys_write(pid, fd, destination.to_utf8_buffer())
+	kernel.sys_close(pid, fd)
+	pprint('Jumping to: %s' % destination)
+	return 0
+pprint('Failed to jump')
+return 1
+""")
+
+	print("[ShipOS] Populated /bin with commands")
+
+## Helper to create a command file in /bin
+func _create_command(name: String, script: String) -> void:
+	var path = "/bin/" + name
+	vfs.create_file(path, 0x1ED, 0, 0, script.to_utf8_buffer())  # 755 permissions
 
 ## Mount all ship device files
 func _mount_ship_devices() -> void:
@@ -94,9 +330,9 @@ func _spawn_init_process() -> void:
 	var hull_val = ship.hull
 	var hull_max_val = ship.hull_max
 
-	var init_script = """print('[INIT] ShipOS booting for %s')
-print('[INIT] Hull: %.1f/%.1f')
-print('[INIT] Systems online')
+	var init_script = """pprint('[INIT] ShipOS booting for %s')
+pprint('[INIT] Hull: %.1f/%.1f')
+pprint('[INIT] Systems online')
 return 0
 """ % [ship_name_escaped, hull_val, hull_max_val]
 

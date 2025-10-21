@@ -1,0 +1,146 @@
+## Aggressive AI - All-out offense, charge toward enemy
+## Rush tactics, close distance, fire constantly
+
+var WEAPON_RANGE: float = 10.0
+var CLOSE_RANGE: float = 50.0  # Desired combat distance
+
+print('[AGGRESSIVE AI] Initializing aggressive combat AI (PID %d)' % pid)
+
+# AGGRESSIVE TACTICS: Max weapon power, minimal everything else
+print('[AGGRESSIVE AI] Setting power: MAX WEAPONS')
+var power_fd = kernel.sys_open(pid, '/dev/ship/actions/power', kernel.O_WRONLY)
+if power_fd >= 0:
+	kernel.sys_write(pid, power_fd, "Weapons:4,Shields:0,Engines:1".to_utf8_buffer())
+	kernel.sys_close(pid, power_fd)
+
+var loop_count = 0
+var max_loops = 100
+
+while loop_count < max_loops:
+	loop_count += 1
+
+	# Step 1: Check if we have a target
+	var target_fd = kernel.sys_open(pid, '/dev/ship/target', kernel.O_RDONLY)
+	if target_fd < 0:
+		print('[AGGRESSIVE AI] ERROR: Cannot access target device')
+		return -1
+
+	var target_data = kernel.sys_read(pid, target_fd, 1024)
+	kernel.sys_close(pid, target_fd)
+	var target_str = target_data.get_string_from_utf8()
+
+	# Step 2: If no target, acquire one IMMEDIATELY
+	if "No target selected" in target_str:
+		print('[AGGRESSIVE AI] No target - acquiring first available...')
+
+		var sensors_fd = kernel.sys_open(pid, '/proc/ship/sensors', kernel.O_RDONLY)
+		if sensors_fd >= 0:
+			var sensors_data = kernel.sys_read(pid, sensors_fd, 4096)
+			kernel.sys_close(pid, sensors_fd)
+			var sensors_str = sensors_data.get_string_from_utf8()
+
+			var lines = sensors_str.split("\n")
+			for line in lines:
+				if line.contains(":") and line.contains("units"):
+					var parts = line.split(":")
+					if parts.size() >= 2:
+						var ship_name = parts[0].strip_edges()
+						print('[AGGRESSIVE AI] ENGAGING: %s' % ship_name)
+
+						var target_write_fd = kernel.sys_open(pid, '/dev/ship/target', kernel.O_WRONLY)
+						if target_write_fd >= 0:
+							kernel.sys_write(pid, target_write_fd, ship_name.to_utf8_buffer())
+							kernel.sys_close(pid, target_write_fd)
+
+							# Re-read target
+							target_fd = kernel.sys_open(pid, '/dev/ship/target', kernel.O_RDONLY)
+							if target_fd >= 0:
+								target_data = kernel.sys_read(pid, target_fd, 1024)
+								kernel.sys_close(pid, target_fd)
+								target_str = target_data.get_string_from_utf8()
+							break
+
+	# Step 3: MOVEMENT - Charge toward target
+	if not ("No target selected" in target_str):
+		# Parse distance from target
+		var distance = -1.0
+		var target_lines = target_str.split("\n")
+		for line in target_lines:
+			if "Distance:" in line:
+				var dist_parts = line.split(":")
+				if dist_parts.size() >= 2:
+					var dist_str = dist_parts[1].strip_edges().split(" ")[0]
+					distance = dist_str.to_float()
+					break
+
+		if distance >= 0:
+			print('[AGGRESSIVE AI] Target distance: %.1f units - CHARGING!' % distance)
+
+			# AGGRESSIVE: Always thrust forward (close the gap)
+			var thrust_fd = kernel.sys_open(pid, '/dev/ship/actions/thrust', kernel.O_WRONLY)
+			if thrust_fd >= 0:
+				kernel.sys_write(pid, thrust_fd, "forward".to_utf8_buffer())
+				kernel.sys_close(pid, thrust_fd)
+
+			# Turn toward target using turn_direction device
+			var turn_dir_fd = kernel.sys_open(pid, '/proc/ship/turn_direction', kernel.O_RDONLY)
+			if turn_dir_fd >= 0:
+				var turn_data = kernel.sys_read(pid, turn_dir_fd, 1024)
+				kernel.sys_close(pid, turn_dir_fd)
+				var turn_str = turn_data.get_string_from_utf8()
+
+				# Parse Turn command from output
+				var turn_lines = turn_str.split("\n")
+				for line in turn_lines:
+					if "Turn:" in line:
+						var turn_parts = line.split(":")
+						if turn_parts.size() >= 2:
+							var turn_cmd = turn_parts[1].strip_edges()
+							print('[AGGRESSIVE AI] Turning: %s' % turn_cmd)
+
+							var turn_fd = kernel.sys_open(pid, '/dev/ship/actions/turn', kernel.O_WRONLY)
+							if turn_fd >= 0:
+								kernel.sys_write(pid, turn_fd, turn_cmd.to_utf8_buffer())
+								kernel.sys_close(pid, turn_fd)
+							break
+
+	# Step 4: FIRE EVERYTHING when in range
+	if not ("No target selected" in target_str):
+		var distance = -1.0
+		var target_lines = target_str.split("\n")
+		for line in target_lines:
+			if "Distance:" in line:
+				var dist_parts = line.split(":")
+				if dist_parts.size() >= 2:
+					var dist_str = dist_parts[1].strip_edges().split(" ")[0]
+					distance = dist_str.to_float()
+					break
+
+		if distance >= 0 and distance <= WEAPON_RANGE:
+			# AGGRESSIVE: Fire ALL ready weapons
+			var weapons_fd = kernel.sys_open(pid, '/proc/ship/weapons', kernel.O_RDONLY)
+			if weapons_fd >= 0:
+				var weapons_data = kernel.sys_read(pid, weapons_fd, 4096)
+				kernel.sys_close(pid, weapons_fd)
+				var weapons_str = weapons_data.get_string_from_utf8()
+
+				var weapon_lines = weapons_str.split("\n")
+				for line in weapon_lines:
+					if "READY" in line and line.contains("["):
+						var bracket_start = line.find("[")
+						var bracket_end = line.find("]")
+						if bracket_start >= 0 and bracket_end > bracket_start:
+							var weapon_idx_str = line.substr(bracket_start + 1, bracket_end - bracket_start - 1)
+							var weapon_idx = weapon_idx_str.to_int()
+
+							print('[AGGRESSIVE AI] FIRING WEAPON %d!' % weapon_idx)
+							var fire_fd = kernel.sys_open(pid, '/dev/ship/actions/fire', kernel.O_WRONLY)
+							if fire_fd >= 0:
+								kernel.sys_write(pid, fire_fd, str(weapon_idx).to_utf8_buffer())
+								kernel.sys_close(pid, fire_fd)
+
+	# For testing, break after one cycle
+	break
+
+print('[AGGRESSIVE AI] Combat cycle complete')
+return 0

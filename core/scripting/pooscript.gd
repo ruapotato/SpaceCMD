@@ -127,9 +127,11 @@ func _start_process(process: Process, args: Array, env: Dictionary) -> void:
 
 	process.script_obj = obj
 
-	# Set kernel interface on the script object
+	# Set kernel interface and VFS on the script object
 	if kernel_interface:
 		obj.set("kernel", kernel_interface)
+	if vfs:
+		obj.set("vfs", vfs)
 
 	# Execute main() if exists
 	if obj.has_method("main"):
@@ -154,13 +156,21 @@ var args: Array = {args}
 var env: Dictionary = {env}
 var vfs = null
 var kernel = null
+var _output: String = ""
 
-# Built-in functions
-func print_poo(msg: String) -> void:
-	print("[PID {pid}] " + msg)
+# Built-in print replacement - appends to output
+func pprint(msg) -> void:
+	var text = str(msg)
+	if _output.is_empty():
+		_output = text
+	else:
+		_output += "\\n" + text
 
 func sleep(seconds: float) -> void:
 	OS.delay_msec(int(seconds * 1000))
+
+func get_output() -> String:
+	return _output
 
 # User code
 func main() -> int:

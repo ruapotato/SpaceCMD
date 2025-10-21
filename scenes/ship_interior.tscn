@@ -1,0 +1,45 @@
+[gd_scene load_steps=7 format=3 uid="uid://ship_interior_001"]
+
+[ext_resource type="Script" path="res://scenes/ship_interior.gd" id="1"]
+[ext_resource type="PackedScene" uid="uid://player_bot_001" path="res://player/player_bot.tscn" id="2"]
+[ext_resource type="PackedScene" uid="uid://helm_console_001" path="res://player/helm_console.tscn" id="3"]
+[ext_resource type="PackedScene" uid="uid://terminal_ui_001" path="res://ui/terminal_ui.tscn" id="4"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_floor"]
+size = Vector3(10, 0.2, 10)
+
+[sub_resource type="Environment" id="Environment_1"]
+background_mode = 1
+background_color = Color(0.2, 0.2, 0.25, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.5, 0.5, 0.5, 1)
+
+[node name="ShipInterior" type="Node3D"]
+script = ExtResource("1")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_1")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 5, 0)
+shadow_enabled = true
+
+[node name="Floor" type="StaticBody3D" parent="."]
+collision_layer = 1
+collision_mask = 0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+shape = SubResource("BoxShape3D_floor")
+
+[node name="FloorMesh" type="CSGBox3D" parent="Floor"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.1, 0)
+size = Vector3(10, 0.2, 10)
+
+[node name="HelmConsole" parent="." instance=ExtResource("3")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -3)
+
+[node name="PlayerBot" parent="." instance=ExtResource("2")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="TerminalUI" parent="." instance=ExtResource("4")]

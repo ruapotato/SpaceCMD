@@ -47,6 +47,13 @@ func _process(delta: float):
 	if not battle_active:
 		return
 
+	# Update all ships (movement, systems, weapons, shields)
+	for ship in all_ships:
+		ship.update(delta)
+		# Update ship's OS
+		if ship.os:
+			ship.os.update(delta)
+
 	# Update all projectiles
 	process_projectiles(delta)
 

@@ -1,0 +1,273 @@
+## Balanced AI - Adaptive tactics based on situation
+## Smart power allocation, analyzes both self and enemy status
+
+var WEAPON_RANGE: float = 10.0
+
+print('[BALANCED AI] Initializing adaptive combat AI (PID %d)' % pid)
+
+var loop_count = 0
+var max_loops = 100
+
+while loop_count < max_loops:
+	loop_count += 1
+
+	# Step 1: Analyze OUR status
+	var status_fd = kernel.sys_open(pid, '/proc/ship/status', kernel.O_RDONLY)
+	if status_fd < 0:
+		print('[BALANCED AI] ERROR: Cannot read ship status')
+		return -1
+
+	var status_data = kernel.sys_read(pid, status_fd, 4096)
+	kernel.sys_close(pid, status_fd)
+	var status_str = status_data.get_string_from_utf8()
+
+	var our_hull_current = 0.0
+	var our_hull_max = 0.0
+	var our_shields_current = 0.0
+	var our_shields_max = 0.0
+
+	var status_lines = status_str.split("\n")
+	for line in status_lines:
+		if "Hull:" in line:
+			var parts = line.split(":")
+			if parts.size() >= 2:
+				var values = parts[1].strip_edges().split("/")
+				if values.size() >= 2:
+					our_hull_current = values[0].to_float()
+					our_hull_max = values[1].to_float()
+		elif "Shields:" in line:
+			var parts = line.split(":")
+			if parts.size() >= 2:
+				var values = parts[1].strip_edges().split("/")
+				if values.size() >= 2:
+					our_shields_current = values[0].to_float()
+					our_shields_max = values[1].to_float()
+
+	var our_hull_percent = our_hull_current / our_hull_max if our_hull_max > 0 else 0.0
+	var our_shields_percent = our_shields_current / our_shields_max if our_shields_max > 0 else 0.0
+
+	# Step 2: Check target and analyze ENEMY status
+	var target_fd = kernel.sys_open(pid, '/dev/ship/target', kernel.O_RDONLY)
+	if target_fd < 0:
+		print('[BALANCED AI] ERROR: Cannot access target device')
+		return -1
+
+	var target_data = kernel.sys_read(pid, target_fd, 1024)
+	kernel.sys_close(pid, target_fd)
+	var target_str = target_data.get_string_from_utf8()
+
+	# Step 3: Acquire target if needed
+	if "No target selected" in target_str:
+		print('[BALANCED AI] No target - scanning...')
+
+		var sensors_fd = kernel.sys_open(pid, '/proc/ship/sensors', kernel.O_RDONLY)
+		if sensors_fd >= 0:
+			var sensors_data = kernel.sys_read(pid, sensors_fd, 4096)
+			kernel.sys_close(pid, sensors_fd)
+			var sensors_str = sensors_data.get_string_from_utf8()
+
+			var lines = sensors_str.split("\n")
+			for line in lines:
+				if line.contains(":") and line.contains("units"):
+					var parts = line.split(":")
+					if parts.size() >= 2:
+						var ship_name = parts[0].strip_edges()
+						print('[BALANCED AI] Target acquired: %s' % ship_name)
+
+						var target_write_fd = kernel.sys_open(pid, '/dev/ship/target', kernel.O_WRONLY)
+						if target_write_fd >= 0:
+							kernel.sys_write(pid, target_write_fd, ship_name.to_utf8_buffer())
+							kernel.sys_close(pid, target_write_fd)
+
+							# Re-read target
+							target_fd = kernel.sys_open(pid, '/dev/ship/target', kernel.O_RDONLY)
+							if target_fd >= 0:
+								target_data = kernel.sys_read(pid, target_fd, 1024)
+								kernel.sys_close(pid, target_fd)
+								target_str = target_data.get_string_from_utf8()
+							break
+
+	# Step 4: Parse enemy status from target
+	var enemy_hull_current = 0.0
+	var enemy_hull_max = 1.0
+	var enemy_shields_current = 0.0
+	var enemy_shields_max = 1.0
+
+	if not ("No target selected" in target_str):
+		var target_lines = target_str.split("\n")
+		for line in target_lines:
+			if "Hull:" in line:
+				var parts = line.split(":")
+				if parts.size() >= 2:
+					var values = parts[1].strip_edges().split("/")
+					if values.size() >= 2:
+						enemy_hull_current = values[0].to_float()
+						enemy_hull_max = values[1].to_float()
+			elif "Shields:" in line:
+				var parts = line.split(":")
+				if parts.size() >= 2:
+					var values = parts[1].strip_edges().split("/")
+					if values.size() >= 2:
+						enemy_shields_current = values[0].to_float()
+						enemy_shields_max = values[1].to_float()
+
+	var enemy_hull_percent = enemy_hull_current / enemy_hull_max if enemy_hull_max > 0 else 0.0
+	var enemy_shields_percent = enemy_shields_current / enemy_shields_max if enemy_shields_max > 0 else 0.0
+
+	# Step 5: SMART POWER ALLOCATION
+	# Analyze the situation and adapt
+	print('[BALANCED AI] Analysis: Us[Hull %.0f%%, Shields %.0f%%] Enemy[Hull %.0f%%, Shields %.0f%%]' % [
+		our_hull_percent * 100, our_shields_percent * 100,
+		enemy_hull_percent * 100, enemy_shields_percent * 100
+	])
+
+	var power_fd = kernel.sys_open(pid, '/dev/ship/actions/power', kernel.O_WRONLY)
+	if power_fd >= 0:
+		if our_hull_percent < 0.3:
+			# CRITICAL - Emergency shields
+			print('[BALANCED AI] Tactic: EMERGENCY DEFENSE (hull critical)')
+			kernel.sys_write(pid, power_fd, "Shields:3,Weapons:1,Engines:0".to_utf8_buffer())
+		elif our_shields_percent < 0.3 and enemy_shields_current > 0:
+			# Enemy has shields, we don't - DEFENSIVE
+			print('[BALANCED AI] Tactic: DEFENSIVE (recharge shields)')
+			kernel.sys_write(pid, power_fd, "Shields:2,Weapons:1,Engines:1".to_utf8_buffer())
+		elif enemy_hull_percent < 0.3 and enemy_shields_current <= 0:
+			# Enemy is weak - FINISH THEM
+			print('[BALANCED AI] Tactic: AGGRESSIVE (finish enemy)')
+			kernel.sys_write(pid, power_fd, "Weapons:3,Shields:1,Engines:0".to_utf8_buffer())
+		elif our_shields_percent > 0.7 and enemy_shields_percent < 0.5:
+			# We have advantage - PRESS IT
+			print('[BALANCED AI] Tactic: OFFENSIVE (press advantage)')
+			kernel.sys_write(pid, power_fd, "Weapons:2,Shields:1,Engines:1".to_utf8_buffer())
+		else:
+			# Even match - BALANCED
+			print('[BALANCED AI] Tactic: BALANCED (even fight)')
+			kernel.sys_write(pid, power_fd, "Weapons:2,Shields:2,Engines:0".to_utf8_buffer())
+		kernel.sys_close(pid, power_fd)
+
+	# Step 5b: ADAPTIVE MOVEMENT - Position based on comparative advantage
+	var distance = -1.0
+	if not ("No target selected" in target_str):
+		var target_lines_check = target_str.split("\n")
+		for line in target_lines_check:
+			if "Distance:" in line:
+				var dist_parts = line.split(":")
+				if dist_parts.size() >= 2:
+					var dist_str = dist_parts[1].strip_edges().split(" ")[0]
+					distance = dist_str.to_float()
+					break
+
+	if distance >= 0:
+		# Calculate our advantage/disadvantage
+		var our_total_health = our_hull_percent + our_shields_percent
+		var enemy_total_health = enemy_hull_percent + enemy_shields_percent
+		var health_advantage = our_total_health - enemy_total_health
+
+		if our_hull_percent < 0.3:
+			# CRITICAL - RETREAT regardless of advantage
+			print('[BALANCED AI] Movement: RETREAT (hull critical)')
+			var thrust_fd = kernel.sys_open(pid, '/dev/ship/actions/thrust', kernel.O_WRONLY)
+			if thrust_fd >= 0:
+				kernel.sys_write(pid, thrust_fd, "backward".to_utf8_buffer())
+				kernel.sys_close(pid, thrust_fd)
+		elif health_advantage > 0.4 and distance > 50.0:
+			# Strong advantage - PRESS IT
+			print('[BALANCED AI] Movement: ADVANCE (advantage: +%.1f%%)' % (health_advantage * 100))
+			var thrust_fd = kernel.sys_open(pid, '/dev/ship/actions/thrust', kernel.O_WRONLY)
+			if thrust_fd >= 0:
+				kernel.sys_write(pid, thrust_fd, "forward".to_utf8_buffer())
+				kernel.sys_close(pid, thrust_fd)
+		elif health_advantage < -0.4:
+			# Disadvantage - RETREAT
+			print('[BALANCED AI] Movement: RETREAT (disadvantage: %.1f%%)' % (health_advantage * 100))
+			var thrust_fd = kernel.sys_open(pid, '/dev/ship/actions/thrust', kernel.O_WRONLY)
+			if thrust_fd >= 0:
+				kernel.sys_write(pid, thrust_fd, "backward".to_utf8_buffer())
+				kernel.sys_close(pid, thrust_fd)
+		elif distance < 40.0:
+			# Too close for balanced tactics - back up slightly
+			print('[BALANCED AI] Movement: BACK UP (too close: %.1f)' % distance)
+			var thrust_fd = kernel.sys_open(pid, '/dev/ship/actions/thrust', kernel.O_WRONLY)
+			if thrust_fd >= 0:
+				kernel.sys_write(pid, thrust_fd, "backward".to_utf8_buffer())
+				kernel.sys_close(pid, thrust_fd)
+		elif distance > 90.0:
+			# Too far - close in
+			print('[BALANCED AI] Movement: CLOSE IN (too far: %.1f)' % distance)
+			var thrust_fd = kernel.sys_open(pid, '/dev/ship/actions/thrust', kernel.O_WRONLY)
+			if thrust_fd >= 0:
+				kernel.sys_write(pid, thrust_fd, "forward".to_utf8_buffer())
+				kernel.sys_close(pid, thrust_fd)
+		else:
+			# Good position - HOLD
+			print('[BALANCED AI] Movement: HOLD (good range: %.1f, advantage: %.1f%%)' % [distance, health_advantage * 100])
+			var thrust_fd = kernel.sys_open(pid, '/dev/ship/actions/thrust', kernel.O_WRONLY)
+			if thrust_fd >= 0:
+				kernel.sys_write(pid, thrust_fd, "stop".to_utf8_buffer())
+				kernel.sys_close(pid, thrust_fd)
+
+		# Turn toward target for balanced combat
+		var turn_dir_fd = kernel.sys_open(pid, '/proc/ship/turn_direction', kernel.O_RDONLY)
+		if turn_dir_fd >= 0:
+			var turn_data = kernel.sys_read(pid, turn_dir_fd, 1024)
+			kernel.sys_close(pid, turn_dir_fd)
+			var turn_str = turn_data.get_string_from_utf8()
+
+			# Parse Turn command from output
+			var turn_lines = turn_str.split("\n")
+			for line in turn_lines:
+				if "Turn:" in line:
+					var turn_parts = line.split(":")
+					if turn_parts.size() >= 2:
+						var turn_cmd = turn_parts[1].strip_edges()
+						print('[BALANCED AI] Turning: %s' % turn_cmd)
+
+						var turn_fd = kernel.sys_open(pid, '/dev/ship/actions/turn', kernel.O_WRONLY)
+						if turn_fd >= 0:
+							kernel.sys_write(pid, turn_fd, turn_cmd.to_utf8_buffer())
+							kernel.sys_close(pid, turn_fd)
+						break
+
+	# Step 6: Intelligent weapon firing
+	# Note: distance already declared in Step 5b, reuse it
+	if not ("No target selected" in target_str) and distance >= 0:
+		if distance <= WEAPON_RANGE:
+			var weapons_fd = kernel.sys_open(pid, '/proc/ship/weapons', kernel.O_RDONLY)
+			if weapons_fd >= 0:
+				var weapons_data = kernel.sys_read(pid, weapons_fd, 4096)
+				kernel.sys_close(pid, weapons_fd)
+				var weapons_str = weapons_data.get_string_from_utf8()
+
+				# BALANCED: Fire 1-2 weapons depending on situation
+				var weapons_to_fire = 1
+				if enemy_shields_current <= 0 and our_shields_percent > 0.5:
+					# Enemy exposed, we're safe - fire multiple
+					weapons_to_fire = 2
+				elif our_hull_percent < 0.5:
+					# We're damaged - conserve, fire one
+					weapons_to_fire = 1
+
+				var fired_count = 0
+				var weapon_lines = weapons_str.split("\n")
+				for line in weapon_lines:
+					if fired_count >= weapons_to_fire:
+						break
+					if "READY" in line and line.contains("["):
+						var bracket_start = line.find("[")
+						var bracket_end = line.find("]")
+						if bracket_start >= 0 and bracket_end > bracket_start:
+							var weapon_idx_str = line.substr(bracket_start + 1, bracket_end - bracket_start - 1)
+							var weapon_idx = weapon_idx_str.to_int()
+
+							print('[BALANCED AI] Firing weapon %d' % weapon_idx)
+							var fire_fd = kernel.sys_open(pid, '/dev/ship/actions/fire', kernel.O_WRONLY)
+							if fire_fd >= 0:
+								kernel.sys_write(pid, fire_fd, str(weapon_idx).to_utf8_buffer())
+								kernel.sys_close(pid, fire_fd)
+							fired_count += 1
+
+	# For testing, break after one cycle
+	break
+
+print('[BALANCED AI] Combat cycle complete')
+return 0

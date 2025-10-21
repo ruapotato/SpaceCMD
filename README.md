@@ -29,9 +29,64 @@ You are a **robot crew member** on a spaceship. Every ship (yours and enemies) r
 
 ---
 
+## 🎯 NEXT STEPS - IMMEDIATE TODO
+
+### ✅ Phase 6: Procedural Ship Interiors & Bot Control COMPLETE!
+
+**Status:** Player can now walk around procedurally generated ship interiors!
+
+**What's Done:**
+- ✅ **Procedural Room Generation System**
+  - Room types: Helm, Engine, Weapons, Reactor, Repair Bay, Shields, Crew Quarters, Cargo
+  - Grid-based layout generator
+  - Automatic room connections and doorways
+  - Configurable ship sizes (basic or random layouts)
+
+- ✅ **3D Room Mesh Generator**
+  - Procedural geometry for rooms (floors, ceilings, walls)
+  - Per-room lighting with thematic colors
+  - Collision detection for floors/walls
+  - Doorway placement between connected rooms
+
+- ✅ **Player Bot (First-Person Controller)**
+  - FPS movement (WASD)
+  - Mouse look camera
+  - Interaction system (raycast + E key)
+  - Mode switching (3D ↔ Terminal)
+
+- ✅ **Room-Specific Consoles**
+  - Helm Console - ship control and navigation
+  - Engine Console - propulsion systems
+  - Weapons Console - weapon control
+  - Reactor Console - power distribution
+  - Each console connects to ShipOS
+
+- ✅ **Terminal UI System**
+  - Fullscreen terminal overlay (press E on console)
+  - Command execution through ShipOS
+  - Command history (arrow keys)
+  - File system access (cat, ls)
+  - Press Escape to return to 3D view
+
+**What This Means:**
+- 🎉 Players control a **bot** that walks around the ship
+- 🎉 Ships are **procedurally generated** with interconnected rooms
+- 🎉 **Dual-mode gameplay**: Walk around in 3D OR use terminal to hack/control
+- 🎉 **Headless mode still works** - all tests pass, terminal-only gameplay possible
+- 🎉 Ready to add **external 3D combat view** while maintaining interior gameplay
+
+**Next Steps:**
+- Add external ship view (3D combat while flying)
+- Add physical weapon models that fire projectiles
+- Add exterior camera toggle
+- Improve doorway visuals (sliding doors, frames)
+- Add viewport texture to show terminal on console screen
+
+---
+
 ## 📊 Current Status
 
-### ✅ PHASE 1-3 COMPLETE! Combat-Ready System
+### ✅ PHASE 1-5b (PARTIAL) COMPLETE! Combat-Ready System with AI Flight
 
 #### Phase 1: Core OS ✅
 **VFS (Virtual File System)** - `core/os/vfs.gd` (~450 lines)
@@ -95,15 +150,19 @@ SpaceCMD/
 │   ├── scripting/   ✅ PooScript
 │   ├── combat/      ✅ CombatManager, Projectile
 │   ├── ship/        ✅ Ship, Weapon, Room, Crew
+│   │                ✅ RoomSystem, ShipGenerator, RoomMeshGenerator
 │   ├── galaxy/      ✅ Stub created
 │   └── hacking/     ⏳ To be implemented
+├── player/          ✅ PlayerBot, HelmConsole
+├── ui/              ✅ TerminalUI
+├── scenes/          ✅ ProceduralShip (playable!)
 ├── autoload/        ✅ GameManager, CombatManager
-├── tests/           ✅ Comprehensive test suite
-├── scripts/ai/      ✅ hostile.poo (working!)
+├── tests/           ✅ Comprehensive test suite (145 passing)
+├── scripts/ai/      ✅ 5 AI variants (all with movement & turning)
 └── project.godot    ✅ Godot 4.4 config
 ```
 
-**Total Code**: ~2,100 lines | **All Tests**: ✅ Passing
+**Total Code**: ~4,500 lines | **All Tests**: ✅ 145 passing
 
 ---
 
@@ -393,18 +452,26 @@ cd ~/SpaceCMD
 
 ---
 
-## 📝 Current Status: Phase 3 Complete! 🎉
+## 📝 Current Status: Phase 6 COMPLETE! - Procedural Ship Interiors! 🏗️🤖
 
-**Completed**: Combat Manager system
-- ✅ Multi-ship battle orchestration
-- ✅ Projectile spawning and collision
-- ✅ Damage system (shields → hull)
-- ✅ Victory/defeat conditions
-- ✅ Full AI combat integration
+**Completed Systems:**
+- ✅ Phase 1-3: Core OS, ShipOS, Combat Manager
+- ✅ Phase 4: Power Systems (51 tests)
+- ✅ Phase 4: AI Variants - 5 scripts (20 tests)
+- ✅ Phase 5: 3D Combat Physics (41 tests)
+- ✅ Phase 5b: AI Movement & Turning (19 tests)
+- ✅ Phase 6: Procedural Ship Interiors
+  - Room generation system (9 room types)
+  - 3D mesh generator
+  - Player bot (FPS controller)
+  - Terminal UI integration
+  - Console interaction system
 
-**Next**: Choose Phase 4 direction (see options above)
+**Total:** 145 tests passing | ~4,500 lines of code
 
-**Recommended**: Option A (Visual Combat) or Option B (AI Variants) for immediate gameplay impact
+**Playable:** Yes! Open in Godot and press F5 to walk around your ship!
+
+**Next Steps:** See "NEXT STEPS - IMMEDIATE TODO" section at top of README
 
 ---
 
@@ -421,6 +488,6 @@ This is a demonstration project. Core systems are built, now building the 3D lay
 
 ---
 
-**Status**: Phases 1-3 Complete - Combat System Operational! 🚀
+**Status**: Phases 1-6 Complete - Playable with Procedural Ship Interiors! 🚀🤖🏗️
 
-*"Every ship is a computer. Every battle is data. Every hit is a syscall."*
+*"Every ship is a computer. Every battle is data. Every hit is a syscall. Every room is procedural. Every bot is you."*

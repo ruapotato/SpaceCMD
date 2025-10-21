@@ -1,0 +1,261 @@
+## Boss AI - Multi-stage adaptive combat AI
+## Changes tactics based on hull percentage
+## Phase 1 (100-70%): Aggressive Assault
+## Phase 2 (70-40%): Balanced Tactics
+## Phase 3 (40-20%): Defensive Recovery
+## Phase 4 (<20%): Berserker Last Stand
+
+var WEAPON_RANGE: float = 10.0
+
+print('[BOSS AI] ═══════════════════════════════════')
+print('[BOSS AI] BOSS SHIP ONLINE (PID %d)' % pid)
+print('[BOSS AI] Multi-Stage Combat Protocol Active')
+print('[BOSS AI] ═══════════════════════════════════')
+
+var loop_count = 0
+var max_loops = 100
+
+while loop_count < max_loops:
+	loop_count += 1
+
+	# Step 1: Comprehensive status analysis
+	var status_fd = kernel.sys_open(pid, '/proc/ship/status', kernel.O_RDONLY)
+	if status_fd < 0:
+		print('[BOSS AI] ERROR: Cannot read ship status')
+		return -1
+
+	var status_data = kernel.sys_read(pid, status_fd, 4096)
+	kernel.sys_close(pid, status_fd)
+	var status_str = status_data.get_string_from_utf8()
+
+	var hull_current = 0.0
+	var hull_max = 0.0
+	var shields_current = 0.0
+	var shields_max = 0.0
+
+	var status_lines = status_str.split("\n")
+	for line in status_lines:
+		if "Hull:" in line:
+			var parts = line.split(":")
+			if parts.size() >= 2:
+				var values = parts[1].strip_edges().split("/")
+				if values.size() >= 2:
+					hull_current = values[0].to_float()
+					hull_max = values[1].to_float()
+		elif "Shields:" in line:
+			var parts = line.split(":")
+			if parts.size() >= 2:
+				var values = parts[1].strip_edges().split("/")
+				if values.size() >= 2:
+					shields_current = values[0].to_float()
+					shields_max = values[1].to_float()
+
+	var hull_percent = hull_current / hull_max if hull_max > 0 else 0.0
+	var shields_percent = shields_current / shields_max if shields_max > 0 else 0.0
+
+	# Step 2: Determine combat phase based on hull
+	var phase = 0
+	var phase_name = ""
+	var power_config = ""
+	var fire_mode = ""
+
+	if hull_percent > 0.70:
+		# PHASE 1: Aggressive Assault
+		phase = 1
+		phase_name = "PHASE 1: AGGRESSIVE ASSAULT"
+		power_config = "Weapons:3,Shields:1,Engines:0"
+		fire_mode = "RAPID_FIRE"
+	elif hull_percent > 0.40:
+		# PHASE 2: Balanced Tactics
+		phase = 2
+		phase_name = "PHASE 2: BALANCED TACTICS"
+		power_config = "Weapons:2,Shields:2,Engines:0"
+		fire_mode = "CONTROLLED"
+	elif hull_percent > 0.20:
+		# PHASE 3: Defensive Recovery
+		phase = 3
+		phase_name = "PHASE 3: DEFENSIVE RECOVERY"
+		power_config = "Weapons:1,Shields:3,Engines:0"
+		fire_mode = "CONSERVATIVE"
+	else:
+		# PHASE 4: Berserker Last Stand
+		phase = 4
+		phase_name = "PHASE 4: BERSERKER MODE"
+		power_config = "Weapons:4,Shields:0,Engines:0"
+		fire_mode = "ALL_WEAPONS"
+
+	print('[BOSS AI] ───────────────────────────────────')
+	print('[BOSS AI] %s' % phase_name)
+	print('[BOSS AI] Hull: %.0f%% | Shields: %.0f%%' % [hull_percent * 100, shields_percent * 100])
+	print('[BOSS AI] ───────────────────────────────────')
+
+	# Step 3: Apply phase-based power allocation
+	var power_fd = kernel.sys_open(pid, '/dev/ship/actions/power', kernel.O_WRONLY)
+	if power_fd >= 0:
+		print('[BOSS AI] Power Config: %s' % power_config)
+		kernel.sys_write(pid, power_fd, power_config.to_utf8_buffer())
+		kernel.sys_close(pid, power_fd)
+
+	# Step 4: Target acquisition (MOVED BEFORE MOVEMENT)
+	var target_fd = kernel.sys_open(pid, '/dev/ship/target', kernel.O_RDONLY)
+	if target_fd < 0:
+		print('[BOSS AI] ERROR: Cannot access target device')
+		return -1
+
+	var target_data = kernel.sys_read(pid, target_fd, 1024)
+	kernel.sys_close(pid, target_fd)
+	var target_str = target_data.get_string_from_utf8()
+
+	# Step 5: Acquire target if needed
+	if "No target selected" in target_str:
+		print('[BOSS AI] Scanning for targets...')
+
+		var sensors_fd = kernel.sys_open(pid, '/proc/ship/sensors', kernel.O_RDONLY)
+		if sensors_fd >= 0:
+			var sensors_data = kernel.sys_read(pid, sensors_fd, 4096)
+			kernel.sys_close(pid, sensors_fd)
+			var sensors_str = sensors_data.get_string_from_utf8()
+
+			var lines = sensors_str.split("\n")
+			for line in lines:
+				if line.contains(":") and line.contains("units"):
+					var parts = line.split(":")
+					if parts.size() >= 2:
+						var ship_name = parts[0].strip_edges()
+						print('[BOSS AI] TARGET LOCKED: %s' % ship_name)
+
+						var target_write_fd = kernel.sys_open(pid, '/dev/ship/target', kernel.O_WRONLY)
+						if target_write_fd >= 0:
+							kernel.sys_write(pid, target_write_fd, ship_name.to_utf8_buffer())
+							kernel.sys_close(pid, target_write_fd)
+
+							# Re-read target
+							target_fd = kernel.sys_open(pid, '/dev/ship/target', kernel.O_RDONLY)
+							if target_fd >= 0:
+								target_data = kernel.sys_read(pid, target_fd, 1024)
+								kernel.sys_close(pid, target_fd)
+								target_str = target_data.get_string_from_utf8()
+							break
+
+	# Step 6: PHASE-BASED MOVEMENT (after target acquisition)
+	var distance = -1.0
+	if not ("No target selected" in target_str):
+		var target_lines = target_str.split("\n")
+		for line in target_lines:
+			if "Distance:" in line:
+				var dist_parts = line.split(":")
+				if dist_parts.size() >= 2:
+					var dist_str = dist_parts[1].strip_edges().split(" ")[0]
+					distance = dist_str.to_float()
+					break
+
+	# Apply movement based on phase and distance
+	if distance >= 0:
+		var thrust_fd = kernel.sys_open(pid, '/dev/ship/actions/thrust', kernel.O_WRONLY)
+		if thrust_fd >= 0:
+			if phase == 1:
+				# PHASE 1: Aggressive Assault - CHARGE!
+				print('[BOSS AI] Movement: CHARGING FORWARD (Phase 1)')
+				kernel.sys_write(pid, thrust_fd, "forward".to_utf8_buffer())
+			elif phase == 2:
+				# PHASE 2: Balanced - Maintain medium range (50-70 units)
+				if distance < 50.0:
+					print('[BOSS AI] Movement: BACKING UP to medium range (Phase 2)')
+					kernel.sys_write(pid, thrust_fd, "backward".to_utf8_buffer())
+				elif distance > 70.0:
+					print('[BOSS AI] Movement: ADVANCING to medium range (Phase 2)')
+					kernel.sys_write(pid, thrust_fd, "forward".to_utf8_buffer())
+				else:
+					print('[BOSS AI] Movement: HOLDING medium range (Phase 2)')
+					kernel.sys_write(pid, thrust_fd, "stop".to_utf8_buffer())
+			elif phase == 3:
+				# PHASE 3: Defensive - RETREAT to recharge
+				print('[BOSS AI] Movement: RETREATING to recharge shields (Phase 3)')
+				kernel.sys_write(pid, thrust_fd, "backward".to_utf8_buffer())
+			elif phase == 4:
+				# PHASE 4: Berserker - ALL-OUT CHARGE!
+				print('[BOSS AI] Movement: 🔥 BERSERKER CHARGE! 🔥 (Phase 4)')
+				kernel.sys_write(pid, thrust_fd, "forward".to_utf8_buffer())
+			kernel.sys_close(pid, thrust_fd)
+
+		# Turn toward target for all phases
+		var turn_dir_fd = kernel.sys_open(pid, '/proc/ship/turn_direction', kernel.O_RDONLY)
+		if turn_dir_fd >= 0:
+			var turn_data = kernel.sys_read(pid, turn_dir_fd, 1024)
+			kernel.sys_close(pid, turn_dir_fd)
+			var turn_str = turn_data.get_string_from_utf8()
+
+			# Parse Turn command from output
+			var turn_lines = turn_str.split("\n")
+			for line in turn_lines:
+				if "Turn:" in line:
+					var turn_parts = line.split(":")
+					if turn_parts.size() >= 2:
+						var turn_cmd = turn_parts[1].strip_edges()
+						print('[BOSS AI] Turning: %s' % turn_cmd)
+
+						var turn_fd = kernel.sys_open(pid, '/dev/ship/actions/turn', kernel.O_WRONLY)
+						if turn_fd >= 0:
+							kernel.sys_write(pid, turn_fd, turn_cmd.to_utf8_buffer())
+							kernel.sys_close(pid, turn_fd)
+						break
+
+	# Step 7: Phase-based weapon firing
+	# Note: distance already declared in Step 6, reuse it
+	if not ("No target selected" in target_str) and distance >= 0:
+		if distance <= WEAPON_RANGE:
+			print('[BOSS AI] Target in range (%.1f units) - Fire Mode: %s' % [distance, fire_mode])
+
+			var weapons_fd = kernel.sys_open(pid, '/proc/ship/weapons', kernel.O_RDONLY)
+			if weapons_fd >= 0:
+				var weapons_data = kernel.sys_read(pid, weapons_fd, 4096)
+				kernel.sys_close(pid, weapons_fd)
+				var weapons_str = weapons_data.get_string_from_utf8()
+
+				var weapons_to_fire = 1
+				if fire_mode == "RAPID_FIRE":
+					weapons_to_fire = 2  # Fire 2 weapons
+				elif fire_mode == "CONTROLLED":
+					weapons_to_fire = 1  # Fire 1 weapon
+				elif fire_mode == "CONSERVATIVE":
+					# Phase 3: Only fire if shields > 50%
+					if shields_percent < 0.5:
+						print('[BOSS AI] Shields low - holding fire, recharging...')
+						weapons_to_fire = 0
+					else:
+						weapons_to_fire = 1
+				elif fire_mode == "ALL_WEAPONS":
+					weapons_to_fire = 99  # Fire EVERYTHING
+
+				var fired_count = 0
+				var weapon_lines = weapons_str.split("\n")
+				for line in weapon_lines:
+					if fired_count >= weapons_to_fire:
+						break
+					if "READY" in line and line.contains("["):
+						var bracket_start = line.find("[")
+						var bracket_end = line.find("]")
+						if bracket_start >= 0 and bracket_end > bracket_start:
+							var weapon_idx_str = line.substr(bracket_start + 1, bracket_end - bracket_start - 1)
+							var weapon_idx = weapon_idx_str.to_int()
+
+							if fire_mode == "ALL_WEAPONS":
+								print('[BOSS AI] 🔥 BERSERKER FIRE - WEAPON %d! 🔥' % weapon_idx)
+							else:
+								print('[BOSS AI] Firing weapon %d' % weapon_idx)
+
+							var fire_fd = kernel.sys_open(pid, '/dev/ship/actions/fire', kernel.O_WRONLY)
+							if fire_fd >= 0:
+								kernel.sys_write(pid, fire_fd, str(weapon_idx).to_utf8_buffer())
+								kernel.sys_close(pid, fire_fd)
+							fired_count += 1
+		elif distance > WEAPON_RANGE:
+			print('[BOSS AI] Target out of range (%.1f > %.1f)' % [distance, WEAPON_RANGE])
+
+	# For testing, break after one cycle
+	break
+
+print('[BOSS AI] ═══════════════════════════════════')
+print('[BOSS AI] Combat cycle complete')
+print('[BOSS AI] ═══════════════════════════════════')
+return 0

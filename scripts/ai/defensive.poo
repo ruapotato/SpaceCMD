@@ -1,0 +1,236 @@
+## Defensive AI - Shield-focused, cautious tactics
+## Prioritize defense, only engage when shields are up
+
+var WEAPON_RANGE: float = 10.0
+var MIN_SHIELDS_TO_FIGHT: float = 0.75  # 75% shields required to engage
+
+print('[DEFENSIVE AI] Initializing defensive combat AI (PID %d)' % pid)
+
+var loop_count = 0
+var max_loops = 100
+
+while loop_count < max_loops:
+	loop_count += 1
+
+	# Step 1: Check our status
+	var status_fd = kernel.sys_open(pid, '/proc/ship/status', kernel.O_RDONLY)
+	if status_fd < 0:
+		print('[DEFENSIVE AI] ERROR: Cannot read ship status')
+		return -1
+
+	var status_data = kernel.sys_read(pid, status_fd, 4096)
+	kernel.sys_close(pid, status_fd)
+	var status_str = status_data.get_string_from_utf8()
+
+	# Parse hull and shields
+	var hull_current = 0.0
+	var hull_max = 0.0
+	var shields_current = 0.0
+	var shields_max = 0.0
+
+	var status_lines = status_str.split("\n")
+	for line in status_lines:
+		if "Hull:" in line:
+			var parts = line.split(":")
+			if parts.size() >= 2:
+				var values = parts[1].strip_edges().split("/")
+				if values.size() >= 2:
+					hull_current = values[0].to_float()
+					hull_max = values[1].to_float()
+		elif "Shields:" in line:
+			var parts = line.split(":")
+			if parts.size() >= 2:
+				var values = parts[1].strip_edges().split("/")
+				if values.size() >= 2:
+					shields_current = values[0].to_float()
+					shields_max = values[1].to_float()
+
+	# Calculate percentages
+	var hull_percent = hull_current / hull_max if hull_max > 0 else 0.0
+	var shields_percent = shields_current / shields_max if shields_max > 0 else 0.0
+
+	print('[DEFENSIVE AI] Status: Hull %.0f%%, Shields %.0f%%' % [hull_percent * 100, shields_percent * 100])
+
+	# Step 2: DEFENSIVE POWER ALLOCATION
+	# More shields when damaged, balanced when healthy
+	var power_fd = kernel.sys_open(pid, '/dev/ship/actions/power', kernel.O_WRONLY)
+	if power_fd >= 0:
+		if hull_percent < 0.5:
+			# Critical hull - MAX SHIELDS
+			print('[DEFENSIVE AI] Hull critical - MAX SHIELDS')
+			kernel.sys_write(pid, power_fd, "Shields:3,Weapons:1,Engines:0".to_utf8_buffer())
+		elif shields_percent < 0.5:
+			# Shields down - RECHARGE
+			print('[DEFENSIVE AI] Shields low - prioritizing recharge')
+			kernel.sys_write(pid, power_fd, "Shields:2,Weapons:1,Engines:1".to_utf8_buffer())
+		else:
+			# Shields up - balanced defense
+			print('[DEFENSIVE AI] Shields good - balanced power')
+			kernel.sys_write(pid, power_fd, "Shields:2,Weapons:2,Engines:0".to_utf8_buffer())
+		kernel.sys_close(pid, power_fd)
+
+	# Step 3: Check distance to target for movement decisions
+	var distance = -1.0
+	var OPTIMAL_RANGE = 70.0  # Defensive positioning - not too close, not too far
+
+	var target_fd_check = kernel.sys_open(pid, '/dev/ship/target', kernel.O_RDONLY)
+	if target_fd_check >= 0:
+		var target_data_check = kernel.sys_read(pid, target_fd_check, 1024)
+		kernel.sys_close(pid, target_fd_check)
+		var target_str_check = target_data_check.get_string_from_utf8()
+
+		if not ("No target selected" in target_str_check):
+			var target_lines_check = target_str_check.split("\n")
+			for line in target_lines_check:
+				if "Distance:" in line:
+					var dist_parts = line.split(":")
+					if dist_parts.size() >= 2:
+						var dist_str = dist_parts[1].strip_edges().split(" ")[0]
+						distance = dist_str.to_float()
+						break
+
+	# Step 3b: DEFENSIVE MOVEMENT - Maintain optimal range, retreat when damaged
+	if distance >= 0:
+		if hull_percent < 0.5 or shields_percent < MIN_SHIELDS_TO_FIGHT:
+			# DAMAGED - RETREAT!
+			print('[DEFENSIVE AI] Damaged (Hull %.0f%%, Shields %.0f%%) - RETREATING!' % [hull_percent * 100, shields_percent * 100])
+			var thrust_fd = kernel.sys_open(pid, '/dev/ship/actions/thrust', kernel.O_WRONLY)
+			if thrust_fd >= 0:
+				kernel.sys_write(pid, thrust_fd, "backward".to_utf8_buffer())
+				kernel.sys_close(pid, thrust_fd)
+		elif distance < OPTIMAL_RANGE - 10.0:
+			# Too close - back up to optimal range
+			print('[DEFENSIVE AI] Too close (%.1f < %.1f) - backing to optimal range' % [distance, OPTIMAL_RANGE])
+			var thrust_fd = kernel.sys_open(pid, '/dev/ship/actions/thrust', kernel.O_WRONLY)
+			if thrust_fd >= 0:
+				kernel.sys_write(pid, thrust_fd, "backward".to_utf8_buffer())
+				kernel.sys_close(pid, thrust_fd)
+		elif distance > OPTIMAL_RANGE + 10.0:
+			# Too far - advance to optimal range
+			print('[DEFENSIVE AI] Too far (%.1f > %.1f) - advancing to optimal range' % [distance, OPTIMAL_RANGE])
+			var thrust_fd = kernel.sys_open(pid, '/dev/ship/actions/thrust', kernel.O_WRONLY)
+			if thrust_fd >= 0:
+				kernel.sys_write(pid, thrust_fd, "forward".to_utf8_buffer())
+				kernel.sys_close(pid, thrust_fd)
+		else:
+			# At optimal range - maintain position
+			print('[DEFENSIVE AI] At optimal range (%.1f) - holding position' % distance)
+			var thrust_fd = kernel.sys_open(pid, '/dev/ship/actions/thrust', kernel.O_WRONLY)
+			if thrust_fd >= 0:
+				kernel.sys_write(pid, thrust_fd, "stop".to_utf8_buffer())
+				kernel.sys_close(pid, thrust_fd)
+
+		# Turn toward target for defensive posture
+		var turn_dir_fd = kernel.sys_open(pid, '/proc/ship/turn_direction', kernel.O_RDONLY)
+		if turn_dir_fd >= 0:
+			var turn_data = kernel.sys_read(pid, turn_dir_fd, 1024)
+			kernel.sys_close(pid, turn_dir_fd)
+			var turn_str = turn_data.get_string_from_utf8()
+
+			# Parse Turn command from output
+			var turn_lines = turn_str.split("\n")
+			for line in turn_lines:
+				if "Turn:" in line:
+					var turn_parts = line.split(":")
+					if turn_parts.size() >= 2:
+						var turn_cmd = turn_parts[1].strip_edges()
+						print('[DEFENSIVE AI] Turning: %s' % turn_cmd)
+
+						var turn_fd = kernel.sys_open(pid, '/dev/ship/actions/turn', kernel.O_WRONLY)
+						if turn_fd >= 0:
+							kernel.sys_write(pid, turn_fd, turn_cmd.to_utf8_buffer())
+							kernel.sys_close(pid, turn_fd)
+						break
+
+	# Step 4: Only fight if shields are adequate and not retreating
+	if shields_percent < MIN_SHIELDS_TO_FIGHT:
+		print('[DEFENSIVE AI] Shields too low (%.0f%% < %.0f%%) - HOLDING FIRE' % [shields_percent * 100, MIN_SHIELDS_TO_FIGHT * 100])
+		# Continue to next cycle (don't break - we're still retreating)
+		loop_count = max_loops  # Exit loop
+		continue
+
+	# Step 4: Check target
+	var target_fd = kernel.sys_open(pid, '/dev/ship/target', kernel.O_RDONLY)
+	if target_fd < 0:
+		print('[DEFENSIVE AI] ERROR: Cannot access target device')
+		return -1
+
+	var target_data = kernel.sys_read(pid, target_fd, 1024)
+	kernel.sys_close(pid, target_fd)
+	var target_str = target_data.get_string_from_utf8()
+
+	# Step 5: Acquire target if needed
+	if "No target selected" in target_str:
+		print('[DEFENSIVE AI] No target - scanning cautiously...')
+
+		var sensors_fd = kernel.sys_open(pid, '/proc/ship/sensors', kernel.O_RDONLY)
+		if sensors_fd >= 0:
+			var sensors_data = kernel.sys_read(pid, sensors_fd, 4096)
+			kernel.sys_close(pid, sensors_fd)
+			var sensors_str = sensors_data.get_string_from_utf8()
+
+			var lines = sensors_str.split("\n")
+			for line in lines:
+				if line.contains(":") and line.contains("units"):
+					var parts = line.split(":")
+					if parts.size() >= 2:
+						var ship_name = parts[0].strip_edges()
+						print('[DEFENSIVE AI] Target acquired: %s' % ship_name)
+
+						var target_write_fd = kernel.sys_open(pid, '/dev/ship/target', kernel.O_WRONLY)
+						if target_write_fd >= 0:
+							kernel.sys_write(pid, target_write_fd, ship_name.to_utf8_buffer())
+							kernel.sys_close(pid, target_write_fd)
+
+							# Re-read target
+							target_fd = kernel.sys_open(pid, '/dev/ship/target', kernel.O_RDONLY)
+							if target_fd >= 0:
+								target_data = kernel.sys_read(pid, target_fd, 1024)
+								kernel.sys_close(pid, target_fd)
+								target_str = target_data.get_string_from_utf8()
+							break
+
+	# Step 6: Cautious firing - only one weapon at a time
+	if not ("No target selected" in target_str):
+		var distance = -1.0
+		var target_lines = target_str.split("\n")
+		for line in target_lines:
+			if "Distance:" in line:
+				var dist_parts = line.split(":")
+				if dist_parts.size() >= 2:
+					var dist_str = dist_parts[1].strip_edges().split(" ")[0]
+					distance = dist_str.to_float()
+					break
+
+		if distance >= 0 and distance <= WEAPON_RANGE:
+			# DEFENSIVE: Fire only ONE weapon at a time (conserve)
+			var weapons_fd = kernel.sys_open(pid, '/proc/ship/weapons', kernel.O_RDONLY)
+			if weapons_fd >= 0:
+				var weapons_data = kernel.sys_read(pid, weapons_fd, 4096)
+				kernel.sys_close(pid, weapons_fd)
+				var weapons_str = weapons_data.get_string_from_utf8()
+
+				var weapon_lines = weapons_str.split("\n")
+				for line in weapon_lines:
+					if "READY" in line and line.contains("["):
+						var bracket_start = line.find("[")
+						var bracket_end = line.find("]")
+						if bracket_start >= 0 and bracket_end > bracket_start:
+							var weapon_idx_str = line.substr(bracket_start + 1, bracket_end - bracket_start - 1)
+							var weapon_idx = weapon_idx_str.to_int()
+
+							print('[DEFENSIVE AI] Firing weapon %d (calculated shot)' % weapon_idx)
+							var fire_fd = kernel.sys_open(pid, '/dev/ship/actions/fire', kernel.O_WRONLY)
+							if fire_fd >= 0:
+								kernel.sys_write(pid, fire_fd, str(weapon_idx).to_utf8_buffer())
+								kernel.sys_close(pid, fire_fd)
+							# Fire only ONE weapon, then reassess
+							break
+		elif distance > WEAPON_RANGE:
+			print('[DEFENSIVE AI] Target out of range - maintaining distance')
+
+	# For testing, break after one cycle
+	break
+
+print('[DEFENSIVE AI] Combat cycle complete')
+return 0
